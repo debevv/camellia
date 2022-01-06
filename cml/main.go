@@ -54,8 +54,12 @@ func getFlags(from uint) map[string]bool {
 	return params
 }
 
+func printStderr(format string, a ...any) {
+	os.Stderr.WriteString(fmt.Sprintf(format, a...))
+}
+
 func printStderrLn(format string, a ...any) {
-	os.Stderr.WriteString(fmt.Sprintf(format+"\n", a...))
+	printStderr(format+"\n", a...)
 }
 
 func errExit(format string, a ...any) int {
@@ -265,23 +269,28 @@ func run() int {
 			return usageExit()
 		}
 
-		c := 'n'
+		c := "n"
+
+		initialize()
 
 		if !flags["-y"] {
-			printStderrLn("Do you really want to wipe the DB at %s ? [y/n] ", cml.GetDBPath())
-			var c rune
-			fmt.Scanf("%c\n", &c)
+			printStderr("Do you really want to wipe the DB at %s ? [y/N] ", cml.GetDBPath())
+			fmt.Scanf("%s\n", &c)
+			c = strings.TrimSpace(c)
+			c = strings.ToLower(c)
 		} else {
-			c = 'y'
+			c = "y"
 		}
 
-		if c == 'y' {
-			initialize()
-
+		if c == "y" {
 			err := cml.Wipe()
 			if err != nil {
 				return errExit("Error wiping the DB - %v", err)
+			} else {
+				printStderrLn("DB was wiped")
 			}
+		} else {
+			printStderrLn("DB was NOT wiped")
 		}
 
 	case "info":
