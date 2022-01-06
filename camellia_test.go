@@ -284,6 +284,39 @@ func TestDelete(t *testing.T) {
 	if err != ErrPathInvalid {
 		t.FailNow()
 	}
+
+	t.Log("Should wipe the DB")
+
+	resetDB(t)
+
+	err = SetValue("/a1/b1/c1/d1", "d1")
+	if err != nil {
+		t.FailNow()
+	}
+
+	err = SetValue("/a1/b2/c1", "c1")
+	if err != nil {
+		t.FailNow()
+	}
+
+	err = SetValue("/a2/b1", "b1")
+	if err != nil {
+		t.FailNow()
+	}
+
+	err = Wipe()
+	if err != nil {
+		t.FailNow()
+	}
+
+	root, err := GetEntries("")
+	if err != nil {
+		t.FailNow()
+	}
+
+	if len(root.Children) != 0 {
+		t.FailNow()
+	}
 }
 
 /*
