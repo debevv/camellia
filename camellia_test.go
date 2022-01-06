@@ -47,6 +47,12 @@ func catchPanic[P any, R any](t *testing.T, p P, f func(P) R) (err error) {
 	return
 }
 
+func check(err error, t *testing.T) {
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestMain(m *testing.M) {
 	testDBFile, err := os.CreateTemp("", "camellia")
 	if err != nil {
@@ -67,24 +73,18 @@ func TestSetGet(t *testing.T) {
 
 	t.Log("Should set a value")
 	err := SetValue("/a/b/c/d", "d")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	t.Log("Should read the same value as the previously set one")
 	v, err := GetValue[string]("/a/b/c/d")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	if v != "d" {
 		t.FailNow()
 	}
 
 	v, err = GetValue[string]("a/b/c/d")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	if v != "d" {
 		t.FailNow()
@@ -141,28 +141,20 @@ func TestSetGet(t *testing.T) {
 		t.FailNow()
 	}
 
+	t.Log("Should overwrite a non-value entry with a value one, on user explicit choice")
 	resetDB(t)
 
 	err = SetValue("/a1/b1/c1/d1", "d")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	err = SetValue("/a1/b1/c2/d1", "d")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
-	t.Log("Should overwrite a non-value entry with a value one, on user explicit choice")
 	err = ForceValue("/a1/b1", "b")
-	if err != nil {
-		t.Fatal()
-	}
+	check(err, t)
 
 	v, err = GetValue[string]("/a1/b1")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	if v != "b" {
 		t.FailNow()
@@ -196,9 +188,7 @@ func TestSetGet(t *testing.T) {
 	}
 
 	v, err = GetValue[string]("/a1/b1/c1/d1")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	if v != "d" {
 		t.FailNow()
@@ -214,9 +204,7 @@ func TestSetGet(t *testing.T) {
 	t.Log("Should panic on getting empty value with GetValueOrPanicEmpty")
 
 	err = SetValue("empty", "")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	err = catchPanic(t, "/empty", GetValueOrPanicEmpty[string])
 	if !errors.Is(err, ErrValueEmpty) {
@@ -230,47 +218,47 @@ func TestDelete(t *testing.T) {
 	t.Log("Should delete an entry and all its children")
 
 	err := SetValue("/a1/b1/c1/d1", "d")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	err = SetValue("/a1/b1/c2/d1", "d")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	err = DeleteEntry("a1/b1")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	e, err := Exists("a1")
-	if err != nil || !e {
+	check(err, t)
+	if !e {
 		t.FailNow()
 	}
 
 	e, err = Exists("a1/b1")
-	if err != nil || e {
+	check(err, t)
+	if e {
 		t.FailNow()
 	}
 
 	e, err = Exists("a1/b1/c1")
-	if err != nil || e {
+	check(err, t)
+	if e {
 		t.FailNow()
 	}
 
 	e, err = Exists("a1/b1/c1/d1")
-	if err != nil || e {
+	check(err, t)
+	if e {
 		t.FailNow()
 	}
 
 	e, err = Exists("a1/b1/c2")
-	if err != nil || e {
+	check(err, t)
+	if e {
 		t.FailNow()
 	}
 
 	e, err = Exists("a1/b1/c2/d1")
-	if err != nil || e {
+	check(err, t)
+	if e {
 		t.FailNow()
 	}
 
@@ -290,29 +278,19 @@ func TestDelete(t *testing.T) {
 	resetDB(t)
 
 	err = SetValue("/a1/b1/c1/d1", "d1")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	err = SetValue("/a1/b2/c1", "c1")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	err = SetValue("/a2/b1", "b1")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	err = Wipe()
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	root, err := GetEntries("")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	if len(root.Children) != 0 {
 		t.FailNow()
@@ -342,29 +320,19 @@ func TestTypedSetGet(t *testing.T) {
 	resetDB(t)
 
 	err := SetValue("/v/string", "string")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	err = SetValue("/v/uint", 1234)
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	err = SetValue("/v/int", -1234)
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	err = SetValue("/v/float64", -1234.5678)
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	err = SetValue("/v/bool", true)
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	/*
 		TODO: See api.go
@@ -376,27 +344,32 @@ func TestTypedSetGet(t *testing.T) {
 	*/
 
 	s, err := GetValue[string]("/v/string")
-	if err != nil || s != "string" {
+	check(err, t)
+	if s != "string" {
 		t.FailNow()
 	}
 
 	u, err := GetValue[uint]("/v/uint")
-	if err != nil || u != 1234 {
+	check(err, t)
+	if u != 1234 {
 		t.FailNow()
 	}
 
 	i, err := GetValue[int]("/v/int")
-	if err != nil || i != -1234 {
+	check(err, t)
+	if i != -1234 {
 		t.FailNow()
 	}
 
 	f, err := GetValue[float64]("/v/float64")
-	if err != nil || f != -1234.5678 {
+	check(err, t)
+	if f != -1234.5678 {
 		t.FailNow()
 	}
 
 	b, err := GetValue[bool]("/v/bool")
-	if err != nil || !b {
+	check(err, t)
+	if !b {
 		t.FailNow()
 	}
 
@@ -429,45 +402,29 @@ func TestToJSON(t *testing.T) {
 	t.Log("Should convert the root Entry to JSON")
 
 	err := SetValue("/a1/b1/c1/d1", "d1")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	err = SetValue("/a1/b1/c1/d2", "d2")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	err = SetValue("/a1/b1/c2/d1", "d1")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	err = SetValue("/a1/b1/c2/d2", "d2")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	err = SetValue("/a2/b1", "b1")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	err = SetValue("/a3", "a3")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	j, err := EntryToJSON("")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	var entries Entry
 	err = json.Unmarshal([]byte(j), &entries)
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	if entries.Children["a1"] == nil ||
 		entries.Children["a1"].Children["b1"] == nil ||
@@ -509,35 +466,23 @@ func TestToJSON(t *testing.T) {
 	resetDB(t)
 
 	err = SetValue("/a1/b1/c1", "c1")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	err = SetValue("/a1/b1/c2", "c2")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	err = SetValue("/a1/b2/c1", "c1")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	j, err = ValuesToJSON("")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	ji := make(map[string]interface{})
 	err = json.Unmarshal([]byte(j), &ji)
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	jb, err := json.Marshal(ji)
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	compare := make(map[string]map[string]map[string]interface{})
 	compare["a1"] = make(map[string]map[string]interface{})
@@ -548,9 +493,7 @@ func TestToJSON(t *testing.T) {
 	compare["a1"]["b2"]["c1"] = "c1"
 
 	jCompare, err := json.Marshal(&compare)
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	if string(jb) != string(jCompare) {
 		t.FailNow()
@@ -578,32 +521,24 @@ func TestFromJson(t *testing.T) {
 	buf.WriteString(j)
 
 	err := SetValuesFromJSON(&buf, false)
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	v, err := GetValue[string]("a1/b1/c1")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	if v != "c1" {
 		t.FailNow()
 	}
 
 	v, err = GetValue[string]("a1/b1/c2")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	if v != "c2" {
 		t.FailNow()
 	}
 
 	v, err = GetValue[string]("a2")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	if v != "a2" {
 		t.FailNow()
@@ -641,33 +576,22 @@ func TestFromJson(t *testing.T) {
 	buf.WriteString(j)
 
 	err = SetEntriesFromJSON(&buf, false)
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	v, err = GetValue[string]("a1/b1/c1")
-	if err != nil {
-		t.FailNow()
-	}
-
+	check(err, t)
 	if v != "c1" {
 		t.FailNow()
 	}
 
 	v, err = GetValue[string]("a1/b1/c2")
-	if err != nil {
-		t.FailNow()
-	}
-
+	check(err, t)
 	if v != "c2" {
 		t.FailNow()
 	}
 
 	v, err = GetValue[string]("a2")
-	if err != nil {
-		t.FailNow()
-	}
-
+	check(err, t)
 	if v != "a2" {
 		t.FailNow()
 	}
@@ -687,32 +611,22 @@ func TestFromJson(t *testing.T) {
 }
 `
 	err = SetValue("e1/e2", "original")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	buf = bytes.Buffer{}
 	buf.WriteString(j)
 
 	err = SetValuesFromJSON(&buf, true)
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	v, err = GetValue[string]("e1/e2")
-	if err != nil {
-		t.FailNow()
-	}
-
+	check(err, t)
 	if v != "original" {
 		t.FailNow()
 	}
 
 	v, err = GetValue[string]("n1/n2")
-	if err != nil {
-		t.FailNow()
-	}
-
+	check(err, t)
 	if v != "merged" {
 		t.FailNow()
 	}
@@ -742,32 +656,22 @@ func TestFromJson(t *testing.T) {
 }
 `
 	err = SetValue("e1/e2", "original")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	buf = bytes.Buffer{}
 	buf.WriteString(j)
 
 	err = SetEntriesFromJSON(&buf, true)
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	v, err = GetValue[string]("e1/e2")
-	if err != nil {
-		t.FailNow()
-	}
-
+	check(err, t)
 	if v != "original" {
 		t.FailNow()
 	}
 
 	v, err = GetValue[string]("n1/n2")
-	if err != nil {
-		t.FailNow()
-	}
-
+	check(err, t)
 	if v != "merged" {
 		t.FailNow()
 	}
@@ -782,9 +686,7 @@ func TestHooks(t *testing.T) {
 	const v = "called"
 
 	err := SetValue(path, "a")
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	var preCalled, postCalled bool
 
@@ -809,9 +711,7 @@ func TestHooks(t *testing.T) {
 	}, false)
 
 	err = SetValue(path, v)
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	if !preCalled || !postCalled {
 		t.FailNow()
@@ -837,9 +737,7 @@ func TestHooks(t *testing.T) {
 	}, true)
 
 	err = SetValue(path, v)
-	if err != nil {
-		t.FailNow()
-	}
+	check(err, t)
 
 	timer := time.NewTimer(1 * time.Second)
 
