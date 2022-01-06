@@ -33,9 +33,13 @@ type Stringable interface {
 	BaseType
 }
 
+type DBEntry struct {
+	ID   int64
+	Name string
+}
+
 type Entry struct {
-	ID         int64
-	Name       string
+	DBEntry
 	LastUpdate time.Time
 	IsValue    bool
 	Value      string
@@ -234,14 +238,33 @@ func GetValueOrPanicEmpty[T Stringable](path string) T {
 	return value
 }
 
-type Children map[string]Children
+func GetEntries(path string) (*Entry, error) {
+	return GetEntriesDepth(path, -1)
+}
 
-func GetChildren(path string, depth uint) (Children, error) {
+func GetEntriesDepth(path string, depth int) (*Entry, error) {
 	if atomic.LoadInt32(&initialized) == 0 {
 		return nil, ErrNotInitialized
 	}
 
-	return nil, nil
+	tx, err := db.Begin()
+	if err != nil {
+		return nil, err
+	}
+
+	entry, err := getEntry(path, tx, depth)
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+
+	return entry, nil
 }
 
 func Exists(path string) (bool, error) {
