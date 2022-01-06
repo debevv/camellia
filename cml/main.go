@@ -11,13 +11,15 @@ import (
 )
 
 const (
-	defaultDBPath = "./cml.db"
-	dbPathFile    = "/tmp/cml.db.path"
+	defaultDBPath = "./camellia.db"
+	dbPathFile    = "/tmp/camellia.db.path"
 )
+
+var initialized = false
 
 func getDBPath() (string, error) {
 	// Try to get it from an environment variable first
-	path := os.Getenv("CONFIG_DB_PATH")
+	path := os.Getenv("CAMELLIA_DB_PATH")
 	if path != "" {
 		return path, nil
 	}
@@ -89,11 +91,32 @@ DB path is selected in this order:
 	return 1
 }
 
+func initialize() {
+	dbPath, err := getDBPath()
+	if err != nil {
+		os.Exit(errExit("Error getting DB path from environment - %v", err))
+	}
+
+	created, err := cml.Init(dbPath)
+	if err != nil {
+		if errors.Is(err, cml.ErrDBVersionMismatch) {
+			os.Exit(errExit("DB version mismatch, needs migration (cml migrate)"))
+		} else {
+			os.Exit(errExit("Error intializing camellia (DB path: %s) - %v", dbPath, err))
+		}
+	}
+
+	if created {
+		printStderrLn("Created new DB file at %s - version %d", dbPath, cml.GetSupportedDBVersion())
+	}
+
+	initialized = true
+}
+
 func run() int {
 	if len(os.Args) < 2 {
 		return usageExit()
 	}
-
 	var onlyMerge bool
 
 	switch os.Args[1] {
@@ -111,6 +134,8 @@ func run() int {
 				return usageExit()
 			}
 		}
+
+		initialize()
 
 		var out string
 		var err error
@@ -155,6 +180,8 @@ func run() int {
 			}
 		}
 
+		initialize()
+
 		if flags["-f"] {
 			err := cml.ForceValue(path, value)
 			if err != nil {
@@ -171,6 +198,8 @@ func run() int {
 		if len(os.Args) < 3 {
 			return usageExit()
 		}
+
+		initialize()
 
 		path := os.Args[2]
 
@@ -206,6 +235,8 @@ func run() int {
 			return errExit("Error opening file %s - %v", filePath, err)
 		}
 
+		initialize()
+
 		if flags["-e"] {
 			err = cml.SetEntriesFromJSON(file, onlyMerge)
 		} else {
@@ -217,6 +248,8 @@ func run() int {
 		}
 
 	case "migrate":
+		initialize()
+
 		migrated, err := cml.Migrate()
 		if err != nil {
 			return errExit("Error migrating DB - %v", err)
@@ -243,13 +276,35 @@ func run() int {
 		}
 
 		if c == 'y' {
+			initialize()
+
 			err := cml.Wipe()
 			if err != nil {
 				return errExit("Error wiping the DB - %v", err)
 			}
 		}
 
+	case "info":
+		/* TODO
+		type info struct {
+			Path    string
+			Version uint64
+			Entries uint
+			Size    uint
+		}
+
+		initialize()
+
+		var i info
+		i.Path = cml.GetDBPath()
+		i.Version = cml.GetSupportedDBVersion()
+		*/
+		fallthrough
+
 	case "help":
+		return usageExit()
+
+	default:
 		return usageExit()
 	}
 
@@ -257,29 +312,13 @@ func run() int {
 }
 
 func main() {
-	dbPath, err := getDBPath()
-	if err != nil {
-		os.Exit(errExit("Error getting DB path from environment - %v", err))
-	}
-
-	created, err := cml.Init(dbPath)
-	if err != nil {
-		if errors.Is(err, cml.ErrDBVersionMismatch) {
-			os.Exit(errExit("DB version mismatch, needs migration (cml migrate)"))
-		} else {
-			os.Exit(errExit("Error intializing camellia (DB path: %s) - %v", dbPath, err))
-		}
-	}
-
-	if created {
-		printStderrLn("Created new DB file at %s - version %d", dbPath, cml.GetSupportedDBVersion())
-	}
-
 	ret := run()
 
-	err = cml.Close()
-	if err != nil {
-		os.Exit(errExit("Error closing DB - %v", err))
+	if initialized {
+		err := cml.Close()
+		if err != nil {
+			os.Exit(errExit("Error closing camellia - %v", err))
+		}
 	}
 
 	os.Exit(ret)
