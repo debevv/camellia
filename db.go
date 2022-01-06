@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -29,9 +27,6 @@ const (
 
 var db *sql.DB
 var dbPath = ""
-var initialized = int32(0)
-
-var mutex sync.Mutex
 
 func newEntry() *Entry {
 	var entry Entry
@@ -81,9 +76,6 @@ func openDB(path string) (bool, error) {
 		return false, fmt.Errorf("DB path is empty")
 	}
 
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	created := false
 
 	db, err = sql.Open("sqlite3", path)
@@ -114,13 +106,6 @@ func openDB(path string) (bool, error) {
 }
 
 func closeDB() error {
-	mutex.Lock()
-	defer mutex.Unlock()
-
-	if atomic.LoadInt32(&initialized) == 0 {
-		return ErrNotInitialized
-	}
-
 	err := db.Close()
 	if err != nil {
 		return err
@@ -307,7 +292,7 @@ func setValue(p, value string, tx *sql.Tx, force bool, skipHooks bool) error {
 		exists = true
 
 		if !isValue {
-			/* Path exists, but it is not a value. If force == true, we delete it and its chidlren to forcibly
+			/* Path exists, but it is not a value. If force == true, we delete it and its children to forcibly
 			   recreate it as the new value */
 			if !force {
 				return ErrPathInvalid

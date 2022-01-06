@@ -14,10 +14,17 @@ import (
 var testDBPath string
 
 func resetDB(t *testing.T) {
-	err := os.Remove(testDBPath)
-	var perr *fs.PathError
-	if err != nil && !errors.As(err, &perr) {
-		t.Fatal(err)
+	if Initialized() {
+		err := Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = os.Remove(testDBPath)
+		var perr *fs.PathError
+		if err != nil && !errors.As(err, &perr) {
+			t.Fatal(err)
+		}
 	}
 
 	created, err := Init(testDBPath)
@@ -519,7 +526,6 @@ func TestToJSON(t *testing.T) {
 }
 
 func TestFromJson(t *testing.T) {
-
 	t.Log("Should import values from JSON file")
 
 	resetDB(t)

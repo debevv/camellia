@@ -3,6 +3,7 @@ package camellia
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -55,7 +56,17 @@ var (
 	ErrDBVersionMismatch = errors.New("DB version mismatch")
 )
 
+var initialized = int32(0)
+var mutex sync.Mutex
+
 func Init(path string) (bool, error) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if atomic.LoadInt32(&initialized) == 1 {
+		return false, nil
+	}
+
 	created, err := openDB(path)
 	if err != nil {
 		return false, fmt.Errorf("error opening DB - %w", err)
@@ -67,6 +78,13 @@ func Init(path string) (bool, error) {
 }
 
 func Close() error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if atomic.LoadInt32(&initialized) == 0 {
+		return ErrNotInitialized
+	}
+
 	err := closeDB()
 	if err != nil {
 		return fmt.Errorf("error closing DB - %w", err)
@@ -77,19 +95,40 @@ func Close() error {
 	return nil
 }
 
+func Initialized() bool {
+	i := atomic.LoadInt32(&initialized)
+	if i == 0 {
+		return false
+	} else {
+		return true
+	}
+}
+
 func Migrate() (bool, error) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	return migrate()
 }
 
 func GetDBPath() string {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	return dbPath
 }
 
 func GetSupportedDBVersion() uint64 {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	return dbVersion
 }
 
 func SetValue[T Stringable](path string, value T) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if atomic.LoadInt32(&initialized) == 0 {
 		return ErrNotInitialized
 	}
@@ -107,6 +146,7 @@ func SetValue[T Stringable](path string, value T) error {
 
 	err = tx.Commit()
 	if err != nil {
+		tx.Rollback()
 		return fmt.Errorf("error committing transaction - %w", err)
 	}
 
@@ -114,6 +154,9 @@ func SetValue[T Stringable](path string, value T) error {
 }
 
 func ForceValue[T Stringable](path string, value T) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if atomic.LoadInt32(&initialized) == 0 {
 		return ErrNotInitialized
 	}
@@ -131,6 +174,7 @@ func ForceValue[T Stringable](path string, value T) error {
 
 	err = tx.Commit()
 	if err != nil {
+		tx.Rollback()
 		return fmt.Errorf("error committing transaction - %w", err)
 	}
 
@@ -138,28 +182,61 @@ func ForceValue[T Stringable](path string, value T) error {
 }
 
 func SetValueOrPanic[T Stringable](path string, value T) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if atomic.LoadInt32(&initialized) == 0 {
 		panic(ErrNotInitialized)
 	}
 
-	err := SetValue(path, value)
+	tx, err := db.Begin()
 	if err != nil {
-		panic(fmt.Errorf("error setting value %v at path %s - %w", value, path, err))
+		panic(fmt.Errorf("error beginning transaction - %w", err))
+	}
+
+	err = setValue(path, fmt.Sprint(value), tx, false, false)
+	if err != nil {
+		tx.Rollback()
+		panic(err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		tx.Rollback()
+		panic(fmt.Errorf("error committing transaction - %w", err))
 	}
 }
 
 func ForceValueOrPanic[T Stringable](path string, value T) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if atomic.LoadInt32(&initialized) == 0 {
 		panic(ErrNotInitialized)
 	}
 
-	err := ForceValue(path, value)
+	tx, err := db.Begin()
 	if err != nil {
-		panic(fmt.Errorf("error forcing value %v at path %s - %w", value, path, err))
+		panic(fmt.Errorf("error beginning transaction - %w", err))
+	}
+
+	err = setValue(path, fmt.Sprint(value), tx, true, false)
+	if err != nil {
+		tx.Rollback()
+		panic(err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		tx.Rollback()
+		panic(fmt.Errorf("error committing transaction - %w", err))
 	}
 }
 
 func GetValue[T Stringable](path string) (T, error) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	var value T
 
 	if atomic.LoadInt32(&initialized) == 0 {
@@ -185,6 +262,7 @@ func GetValue[T Stringable](path string) (T, error) {
 
 	err = tx.Commit()
 	if err != nil {
+		tx.Rollback()
 		return value, fmt.Errorf("error committing transaction - %w", err)
 	}
 
@@ -192,24 +270,50 @@ func GetValue[T Stringable](path string) (T, error) {
 }
 
 func GetValueOrPanic[T Stringable](path string) T {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	var value T
+
 	if atomic.LoadInt32(&initialized) == 0 {
 		panic(ErrNotInitialized)
 	}
 
-	value, err := GetValue[T](path)
+	tx, err := db.Begin()
 	if err != nil {
-		panic(fmt.Errorf("error getting value %s - %w", path, err))
+		panic(fmt.Errorf("error beginning transaction - %w", err))
+	}
+
+	valueString, err := getValue(path, tx)
+	if err != nil {
+		tx.Rollback()
+		panic(err)
+	}
+
+	value, err = convertValue[T](valueString)
+	if err != nil {
+		tx.Rollback()
+		panic(fmt.Errorf("error converting value %v to string - %w", value, err))
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		tx.Rollback()
+		panic(fmt.Errorf("error committing transaction - %w", err))
 	}
 
 	return value
 }
 
 func GetValueOrPanicEmpty[T Stringable](path string) T {
-	var value T
+	mutex.Lock()
+	defer mutex.Unlock()
 
 	if atomic.LoadInt32(&initialized) == 0 {
 		panic(ErrNotInitialized)
 	}
+
+	var value T
 
 	tx, err := db.Begin()
 	if err != nil {
@@ -233,7 +337,11 @@ func GetValueOrPanicEmpty[T Stringable](path string) T {
 		panic(fmt.Errorf("error converting value %s - %w", path, err))
 	}
 
-	tx.Commit()
+	err = tx.Commit()
+	if err != nil {
+		tx.Rollback()
+		panic(fmt.Errorf("error committing transaction - %w", err))
+	}
 
 	return value
 }
@@ -243,13 +351,16 @@ func GetEntries(path string) (*Entry, error) {
 }
 
 func GetEntriesDepth(path string, depth int) (*Entry, error) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if atomic.LoadInt32(&initialized) == 0 {
 		return nil, ErrNotInitialized
 	}
 
 	tx, err := db.Begin()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error beginning transaction - %w", err)
 	}
 
 	entry, err := getEntry(path, tx, depth)
@@ -261,20 +372,23 @@ func GetEntriesDepth(path string, depth int) (*Entry, error) {
 	err = tx.Commit()
 	if err != nil {
 		tx.Rollback()
-		return nil, err
+		return nil, fmt.Errorf("error committing transaction - %w", err)
 	}
 
 	return entry, nil
 }
 
 func Exists(path string) (bool, error) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if atomic.LoadInt32(&initialized) == 0 {
 		return false, ErrNotInitialized
 	}
 
 	tx, err := db.Begin()
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("error beginning transaction - %w", err)
 	}
 
 	_, _, err = getPathRowID(path, tx)
@@ -287,19 +401,27 @@ func Exists(path string) (bool, error) {
 			return false, err
 		}
 	} else {
-		tx.Commit()
+		err = tx.Commit()
+		if err != nil {
+			tx.Rollback()
+			return false, fmt.Errorf("error committing transaction - %w", err)
+		}
+
 		return true, nil
 	}
 }
 
 func DeleteEntry(path string) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if atomic.LoadInt32(&initialized) == 0 {
 		return ErrNotInitialized
 	}
 
 	tx, err := db.Begin()
 	if err != nil {
-		return err
+		return fmt.Errorf("error beginning transaction - %w", err)
 	}
 
 	id, _, err := getPathRowID(path, tx)
@@ -316,20 +438,23 @@ func DeleteEntry(path string) error {
 
 	err = tx.Commit()
 	if err != nil {
-		return err
+		return fmt.Errorf("error committing transaction - %w", err)
 	}
 
 	return nil
 }
 
 func Wipe() error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if atomic.LoadInt32(&initialized) == 0 {
 		return ErrNotInitialized
 	}
 
 	tx, err := db.Begin()
 	if err != nil {
-		return err
+		return fmt.Errorf("error beginning transaction - %w", err)
 	}
 
 	root, err := getEntry("/", tx, 1)
@@ -347,7 +472,7 @@ func Wipe() error {
 
 	err = tx.Commit()
 	if err != nil {
-		return err
+		return fmt.Errorf("error committing transaction - %w", err)
 	}
 
 	return nil
@@ -374,7 +499,7 @@ func convertValue[T Stringable](valueString string) (T, error) {
 			}
 		} else {
 	*/
-	n, err := fmt.Sscanf(valueString, "%v", &value)
+	n, err := fmt.Sscan(valueString, &value)
 	if n != 1 {
 		return value, fmt.Errorf("error converting value to requested type")
 	}

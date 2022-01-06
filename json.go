@@ -52,6 +52,9 @@ func (e Entry) MarshalJSON() ([]byte, error) {
 }
 
 func ValuesToJSON(path string) (string, error) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if atomic.LoadInt32(&initialized) == 0 {
 		return "", ErrNotInitialized
 	}
@@ -88,6 +91,9 @@ func ValuesToJSON(path string) (string, error) {
 }
 
 func EntryToJSON(path string) (string, error) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if atomic.LoadInt32(&initialized) == 0 {
 		return "", ErrNotInitialized
 	}
@@ -122,6 +128,9 @@ func EntryToJSON(path string) (string, error) {
 }
 
 func SetValuesFromJSON(reader io.Reader, onlyMerge bool) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if atomic.LoadInt32(&initialized) == 0 {
 		return ErrNotInitialized
 	}
@@ -195,6 +204,9 @@ func SetValuesFromJSON(reader io.Reader, onlyMerge bool) error {
 }
 
 func SetEntriesFromJSON(reader io.Reader, onlyMerge bool) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if atomic.LoadInt32(&initialized) == 0 {
 		return ErrNotInitialized
 	}

@@ -32,10 +32,24 @@ func SetHooksEnabled(enabled bool) {
 }
 
 func SetPreSetHook(path string, callback func(path string, value string) error) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if atomic.LoadInt32(&initialized) == 0 {
+		return ErrNotInitialized
+	}
+
 	return setHook(path, callback, false, hookTypePre)
 }
 
 func SetPostSetHook(path string, callback func(path string, value string) error, async bool) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if atomic.LoadInt32(&initialized) == 0 {
+		return ErrNotInitialized
+	}
+
 	return setHook(path, callback, async, hookTypePost)
 }
 
@@ -47,9 +61,6 @@ func callHooks(path string, value string, hT hookType) error {
 	if atomic.LoadUint32(&hooksEmpty) == 1 {
 		return nil
 	}
-
-	mutex.Lock()
-	defer mutex.Unlock()
 
 	if hooks[hT] != nil && hooks[hT][path] != nil {
 		for i, h := range hooks[hT][path] {
@@ -63,7 +74,7 @@ func callHooks(path string, value string, hT hookType) error {
 						case hookTypePost:
 							return fmt.Errorf("error calling post set hook %d - %w", i, err)
 						default:
-							return fmt.Errorf("error calling UKNOWN TYPE hook %d - %w", i, err)
+							return fmt.Errorf("error calling UNKNOWN TYPE hook %d - %w", i, err)
 						}
 					}
 				} else {
@@ -85,13 +96,6 @@ func callPostSetHook(path string, value string) error {
 }
 
 func setHook(path string, callback func(path string, value string) error, async bool, hT hookType) error {
-	if atomic.LoadInt32(&initialized) == 0 {
-		return ErrNotInitialized
-	}
-
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	if hooks[hT] == nil {
 		hooks[hT] = make(map[string][]*hook)
 	}
