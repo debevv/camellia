@@ -1,23 +1,27 @@
 # camellia 💮 - A lightweight hierarchical key-value store, written in Go
 
-`camellia` is a Go library that implements a simple, hierarchical, persistent key-value store, backed by SQLite.  
-Its simple API is paired to the `cml` command line utility, useful to read, write and import/export a `camellia` DB.  
-The project was born to be used in an Linux embedded system, as a system-wide settings registry, similar to the one found in Windows.
+`camellia` is a Go library that implements a simple, hierarchical, persistent key-value store, backed by a SQLite database.  
+It is paired to the `cml` command line utility, useful to read, write and import/export a `camellia` DB.  
+The project was born to be part of a Linux embedded system as a system-wide settings registry, similar to the one found in Windows.
 
 - Library
 
   - [At a glance](#at-a-glance)
   - [Installation and prerequisites](#installation-and-prerequisites)
-  - [Data model](#data-model)
+  - [Overview](#overview)
+  - [Types](#types)
   - [JSON import/export](#json-import-/-export)
   - [Hooks](#hooks)
 
 - `cml` utility
   - [At a glance](#at-a-glance)
+  - [Database path](#database-path)
+
+---
 
 ## Library
 
-### At a glance
+## At a glance
 
 ```go
 package examples
@@ -76,16 +80,18 @@ func main() {
 - Go `1.18` or greater, since this module makes use of generics
 - A C compiler and `libsqlite3`, given the dependency to [go-sqlite3](https://github.com/mattn/go-sqlite3)
 
-**Installation:**
+**Installation:**  
+Inside a module, run:
 
 ```
 go get github.com/debevv/camellia
 ```
 
-### Data model
+## Overview
 
-`camellia` data model is extremely simple. Every entity in the DB is described as an `Entry`.  
-An `Entry` has the following properties:
+**Entries**  
+The data model is extremely simple.  
+Every entity in the DB is ab `Entry`. An `Entry` has the following properties:
 
 ```go
 LastUpdate time.Time
@@ -116,7 +122,45 @@ type Entry struct {
 }
 ```
 
-### JSON import/export
+**Paths**  
+Paths are defined as strings separated by slashes (`/`). At the moment of writing this document, no limits are imposed to the length of a segment or to the length of the full path.
+The root Entry is identified as a single slash `/`.  
+When specifying a path, the initial slash can be omitted, so, for example, `my/path` is equivalent to `/my/path`, and and an empty string is equivalent to `/`.
+
+**Database versioning and migration**  
+The schema of the DB is versioned, so after updating the library, `Init()` may return `ErrDBVersionMismatch`. In this case, you should perform the migration of the DB by calling `Migrate()`.
+
+**Setting and forcing**  
+When setting a value, if a an Entry at that path already exists, but it's a non-value Entry, the operation fails.  
+Forcing a value instead will first delete the existing Entry (and all its children), and then replace it with the new value.
+
+**Concurrency**
+TBD
+
+## Types
+
+The internal data format for `Entries`' values is `string`. For this reason, the library API offers a set of methods that accept a type parameter and automatically serializes/deserializes values to/from `string`. Example:
+
+```go
+// Gets the value at `path` and converts it to T
+func GetValue[T Stringable](path string) (T, error)
+
+// Converts `value` from T to `string` and sets it at `path`
+func SetValue[T Stringable](path string, value T) error
+```
+
+The constraint of the type parameter is the `Stringable` `interface`:
+
+```go
+type Stringable interface {
+	BaseType
+}
+```
+
+that in turn is composed by the `BaseType` `interface`, the collection of almost all Go supported base types.  
+Data satisfying the `BaseType` interface is serialized using `fmt.Sprint()` and deserialized using `fmt.Scan`.
+
+## JSON import/export
 
 **Formats**  
 Entries can be imported/exported from/to JSON.  
@@ -208,42 +252,95 @@ func EntriesToJSON(path string) (string, error)
 **Import and merge**  
 When importing from JSON, two distinct modes of operation are supported:
 
-- **Import**: the default operation. Overwrites any existing value with the one found in the JSON input
-- **Merge**: like import, but does not overwrite existing values with the ones found in the JSON input.
+- **Import**: the default operation. Overwrites any existing value with the one found in the input JSON. When overwriting, it forces values instead of just attempting to set them.
+- **Merge**: like import, but does not overwrite existing values with the ones found in the input JSON
 
-### Hooks
+## Hooks
 
 Hooks are callback methods that can be registered to run before (pre) and after (post) the setting of a certain value:
 
 ```go
-    // Register a pre set hook to check the value before it is set
-	cml.SetPreSetHook("/sensors/temperature/saturation", func(path, value string) error {
-		saturation, err := strconv.Atoi(value)
-		if err != nil {
-			return fmt.Errorf("invalid saturation value")
-		}
+// Register a pre set hook to check the value before it is set
+cml.SetPreSetHook("/sensors/temperature/saturation", func(path, value string) error {
+    saturation, err := strconv.Atoi(value)
+    if err != nil {
+        return fmt.Errorf("invalid saturation value")
+    }
 
-		// Block the setting of the value if it's out of range
-		if saturation < 0 || saturation > 100 {
-			return fmt.Errorf("invalid saturation value. Must be a percentage value")
-		}
+    // Block the setting of the value if it's out of range
+    if saturation < 0 || saturation > 100 {
+        return fmt.Errorf("invalid saturation value. Must be a percentage value")
+    }
 
-		return nil
-	})
+    return nil
+})
 
-    // Register a sync post set hook to react to changes
-	cml.SetPostSetHook("/status/system/areWeOk", func(path, value string) error {
-		if value == "true" {
-			fmt.Printf("System went back to normal")
-		} else {
-			fmt.Printf("Something bad happened")
-		}
+// Register an async post set hook and react to changes
+cml.SetPostSetHook("/status/system/areWeOk", func(path, value string) error {
+    if value == "true" {
+        fmt.Printf("System went back to normal")
+    } else {
+        fmt.Printf("Something bad happened")
+    }
 
-		return nil
-	}, false)
+    return nil
+}, true)
 ```
 
 Hooks can be synchronous or asynchronous:
 
 - Synchronous hooks are run on the same thread calling the `Set()` method. They can block the setting of a value by returning a non-`nil` error.
 - Asynchronous hooks are run on a new goroutine, and their return value is ignored (so the can't block the setting). Only post set hooks can be asynchronous.
+
+---
+
+## `cml` utility
+
+## At a glance
+
+```sh
+# Set some values
+cml set status/userIdentifier "ABCDEF123456"
+cml set /status/system/areWeOk "true"
+cml set sensors/saturation/latestValue 99
+cml set /sensors/temperature/latestValue "-48.0"
+
+# Get a value
+cml get /sensors/temperature/latestValue
+# -48.0
+
+# Get some values
+cml get /sensors
+# {
+#   "saturation": {
+#       "latestValue": "99"
+#   },
+#   "temperature": {
+#       "latestValue": "-48.0"
+#   }
+# }
+
+# Get Entries properties
+cml get -e sensors/temperature
+# {
+#    "last_update_ms": "1641453582957",
+#    "children": {
+#      "lastValue": {
+#        "last_update_ms": "1641453582957",
+#        "value": "-48.0"
+#      }
+#    }
+# }
+
+# Try to get a value, fail if is not
+cml get -v sensors
+# Error getting value - path is not a value
+```
+
+## Database path
+
+`cml` attempts to automatically determine the path of the SQLite database by reading it from different sources, in the following order:
+
+- From the `CAMELLIA_DB_PATH` environment variable, then
+- From the file `/tmp/camellia.db.path`, then
+- If the steps above fail, the path used is `./camellia.db`
