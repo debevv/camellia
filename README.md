@@ -73,14 +73,15 @@ func main() {
 
 ```
 
-### Installation and prerequisites
+## Installation and prerequisites
 
-**Prerequisites:**
+### Prerequisites
 
 - Go `1.18` or greater, since this module makes use of generics
 - A C compiler and `libsqlite3`, given the dependency to [go-sqlite3](https://github.com/mattn/go-sqlite3)
 
-**Installation:**  
+### Installation
+
 Inside a module, run:
 
 ```
@@ -89,7 +90,8 @@ go get github.com/debevv/camellia
 
 ## Overview
 
-**Entries**  
+### Entries
+
 The data model is extremely simple.  
 Every entity in the DB is ab `Entry`. An `Entry` has the following properties:
 
@@ -122,19 +124,23 @@ type Entry struct {
 }
 ```
 
-**Paths**  
+### Paths
+
 Paths are defined as strings separated by slashes (`/`). At the moment of writing this document, no limits are imposed to the length of a segment or to the length of the full path.
 The root Entry is identified as a single slash `/`.  
 When specifying a path, the initial slash can be omitted, so, for example, `my/path` is equivalent to `/my/path`, and and an empty string is equivalent to `/`.
 
-**Database versioning and migration**  
+### Database versioning and migration
+
 The schema of the DB is versioned, so after updating the library, `Init()` may return `ErrDBVersionMismatch`. In this case, you should perform the migration of the DB by calling `Migrate()`.
 
-**Setting and forcing**  
+### Setting and forcing
+
 When setting a value, if a an Entry at that path already exists, but it's a non-value Entry, the operation fails.  
 Forcing a value instead will first delete the existing Entry (and all its children), and then replace it with the new value.
 
-**Concurrency**
+### Concurrency
+
 TBD
 
 ## Types
@@ -160,9 +166,34 @@ type Stringable interface {
 that in turn is composed by the `BaseType` `interface`, the collection of almost all Go supported base types.  
 Data satisfying the `BaseType` interface is serialized using `fmt.Sprint()` and deserialized using `fmt.Scan`.
 
+### Note on custom types
+
+The library defines an additional `interface` for serialization:
+
+```go
+type CustomStringable interface {
+	String() string
+	FromString(s string) error
+}
+```
+
+intended to be used as a base for user-defined serializable types.  
+Unfortunately, support to custom types is not implemented at the moment, since go 1.18 does not allow to define `Stringable` in this way:
+
+```go
+type Stringable interface {
+  BaseType | CustomStringable
+}
+```
+
+since unions of interfaces defining methods are not supported for now.
+
+Please refer to this [comment](https://github.com/golang/go/issues/45346#issuecomment-862505803) for more details.
+
 ## JSON import/export
 
-**Formats**  
+### Formats
+
 Entries can be imported/exported from/to JSON.  
 Two different formats are supported:
 
@@ -249,7 +280,10 @@ func SetEntriesFromJSON(reader io.Reader, onlyMerge bool) error
 func EntriesToJSON(path string) (string, error)
 ```
 
-**Import and merge**  
+A note on `last_update_ms`: this property will be put in the JSON when exporting, but ignored when importing. The value of this property will be set to the timestamp of the actual moment of setting the Entry.
+
+### Import and merge
+
 When importing from JSON, two distinct modes of operation are supported:
 
 - **Import**: the default operation. Overwrites any existing value with the one found in the input JSON. When overwriting, it forces values instead of just attempting to set them.
@@ -302,7 +336,7 @@ Hooks can be synchronous or asynchronous:
 # Set some values
 cml set status/userIdentifier "ABCDEF123456"
 cml set /status/system/areWeOk "true"
-cml set sensors/saturation/latestValue 99
+cml set "sensors/saturation/latestValue" 99
 cml set /sensors/temperature/latestValue "-48.0"
 
 # Get a value
@@ -320,7 +354,7 @@ cml get /sensors
 #   }
 # }
 
-# Get Entries properties
+# Get Entries in the extended format
 cml get -e sensors/temperature
 # {
 #    "last_update_ms": "1641453582957",
@@ -332,9 +366,20 @@ cml get -e sensors/temperature
 #    }
 # }
 
-# Try to get a value, fail if is not
+# Try to get a value, fail if it's a non-value
 cml get -v sensors
 # Error getting value - path is not a value
+
+# Merge values from JSON file
+cml merge path/to/file.json
+```
+
+## Installation
+
+Install `cml` globally with:
+
+```
+go install github.com/debevv/camellia/cml@latest
 ```
 
 ## Database path
