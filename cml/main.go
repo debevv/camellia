@@ -73,9 +73,9 @@ cfg get [-e] [-v] <path>        Displays the configuration entry (and its childr
 cfg set [-f] <path> <value>     Sets the configuration entry at <path> to <value>
                                 -f        Forces overwrite of non-value entries
 cfg delete <path>               Deletes a configuration entry (and its children)
-cfg import <file>               Imports config entries from JSON <file>
+cfg import [-e] <file>          Imports config entries from JSON <file>
                                 -e        Use the extended JSON format
-cfg merge <file>                Imports only non-existing config entries from JSON <file>
+cfg merge [-e] <file>           Imports only non-existing config entries from JSON <file>
                                 -e        Use the extended JSON format
 cfg migrate                     Migrates the DB to the current supported version
 cfg wipe [-y]                   Wipes the DB

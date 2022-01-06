@@ -126,7 +126,7 @@ type Entry struct {
 
 ### Paths
 
-Paths are defined as strings separated by slashes (`/`). At the moment of writing this document, no limits are imposed to the length of a segment or to the length of the full path.
+Paths are defined as strings separated by slashes (`/`). At the moment of writing this document, no limits are imposed to the length of a segment or to the length of the full path.  
 The root Entry is identified as a single slash `/`.  
 When specifying a path, the initial slash can be omitted, so, for example, `my/path` is equivalent to `/my/path`, and and an empty string is equivalent to `/`.
 
@@ -141,7 +141,8 @@ Forcing a value instead will first delete the existing Entry (and all its childr
 
 ### Concurrency
 
-TBD
+The library API should be safe to be called by different goroutines.  
+Regarding the usage of the same DB from different processes, it should be safe too, but more details will be added in the future (TBD).
 
 ## Types
 
@@ -197,7 +198,7 @@ Please refer to this [comment](https://github.com/golang/go/issues/45346#issueco
 Entries can be imported/exported from/to JSON.  
 Two different formats are supported:
 
-- The default one, meant to represent only the hierarchical relationship of Entries and their values. This will be the format used in most cases:
+- **Default**: meant to represent only the hierarchical relationship of Entries and their values. This will be the format used in most cases:
 
 ```json
 {
@@ -225,7 +226,7 @@ func SetValuesFromJSON(reader io.Reader, onlyMerge bool) error
 func ValuesToJSON(path string) (string, error)
 ```
 
-- The extended one, carrying the all the properties of each Entry. The format was created to accommodate any future addition of useful metadata:
+- **Extended**: carrying the all the properties of each Entry. The format was created to accommodate any future addition of useful metadata:
 
 ```json
 {
@@ -380,6 +381,27 @@ Install `cml` globally with:
 
 ```
 go install github.com/debevv/camellia/cml@latest
+```
+
+## Just the output of `cml help`
+
+```
+cml - The camellia hierarchical key-value store utility
+Usage:
+cfg get [-e] [-v] <path>        Displays the configuration entry (and its children) at <path> in JSON format
+                                -e        Displays entries in the extended JSON format
+                                -v        Fails (returns nonzero) if the entry is not a value
+cfg set [-f] <path> <value>     Sets the configuration entry at <path> to <value>
+                                -f        Forces overwrite of non-value entries
+cfg delete <path>               Deletes a configuration entry (and its children)
+cfg import [-e] <file>          Imports config entries from JSON <file>
+                                -e        Use the extended JSON format
+cfg merge [-e] <file>           Imports only non-existing config entries from JSON <file>
+                                -e        Use the extended JSON format
+cfg migrate                     Migrates the DB to the current supported version
+cfg wipe [-y]                   Wipes the DB
+                                -y        Does not ask for confirmation
+cfg help                        Displays this help message
 ```
 
 ## Database path
