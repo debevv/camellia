@@ -156,7 +156,7 @@ func SetValuesFromJSON(reader io.Reader, onlyMerge bool) error {
 		str, ok := entry.(string)
 		if ok {
 			if onlyMerge {
-				exists, err := Exists(p)
+				exists, err := exists(p, tx)
 				if err != nil {
 					return fmt.Errorf("error checking existence of value %s - %w", p, err)
 				}

@@ -620,3 +620,16 @@ func deleteEntry(entryID int64, tx *sql.Tx) error {
 
 	return nil
 }
+
+func exists(path string, tx *sql.Tx) (bool, error) {
+	_, _, err := getPathRowID(path, tx)
+	if err != nil {
+		if errors.Is(err, ErrPathNotFound) {
+			return false, nil
+		} else {
+			return false, err
+		}
+	} else {
+		return true, nil
+	}
+}
