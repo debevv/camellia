@@ -1,8 +1,8 @@
 # camellia 💮 A lightweight hierarchical key-value store
 
 `camellia` is a Go library that implements a simple, hierarchical, persistent key-value store, backed by a SQLite database.  
-It is paired to the `cml` command line utility, useful to read, write and import/export a `camellia` DB.  
-The project was born to be part of a Linux embedded system as a system-wide settings registry, similar to the one found in Windows.
+It is paired with the `cml` command line utility, useful to read, write and import/export a `camellia` DB.  
+The project was born to be the system-wide settings registry of a Linux embedded system, similar to the one found in Windows.
 
 - Library
 
@@ -16,6 +16,8 @@ The project was born to be part of a Linux embedded system as a system-wide sett
 
 - `cml` utility
   - [Command at a glance](#command-at-a-glance)
+  - [Installation](#installation)
+  - [Output of cml help](#output-of-cml-help)
   - [Database path](#database-path)
 
 ---
@@ -388,7 +390,7 @@ Install `cml` globally with:
 go install github.com/debevv/camellia/cml@latest
 ```
 
-## Just the output of `cml help`
+## Output of `cml help`
 
 ```
 cml - The camellia hierarchical key-value store utility
