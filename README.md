@@ -1,7 +1,7 @@
-# camellia 💮 A lightweight hierarchical key-value store
+# camellia 💮 A lightweight, persistent, hierarchical key-value store
 
-`camellia` is a Go library that implements a simple, hierarchical, persistent key-value store, backed by a SQLite database.  
-It is paired with the `cml` command line utility, useful to read, write and import/export a `camellia` DB.  
+`camellia` is a Go library that implements a hierarchical, persistent key-value store, backed by a SQLite database. Its minimal footprint (just a single `.db` file) makes it suitable for usage in embedded systems, or simply as a minimalist application settings container.  
+Additionally, this repository contains the companion `cml` command line utility, useful to read, write and import/export a `camellia` DB.  
 The project was born to be the system-wide settings registry of a Linux embedded system, similar to the one found in Windows.
 
 - Library
@@ -14,8 +14,8 @@ The project was born to be the system-wide settings registry of a Linux embedded
   - [JSON import/export](#json-importexport)
   - [Hooks](#hooks)
 
-- `cml` utility
-  - [Command at a glance](#command-at-a-glance)
+- `cml` command
+  - [Command line at a glance](#command-line-at-a-glance)
   - [Installation](#installation)
   - [Output of cml help](#output-of-cml-help)
   - [Database path](#database-path)
@@ -37,41 +37,54 @@ import (
 )
 
 func main() {
-	_, err := cml.Init("/home/debevv/cml.db")
-	if err != nil {
-		fmt.Printf("Error initializing camellia - %v", err)
-		os.Exit(1)
-	}
+  _, err := cml.Init("/home/debevv/camellia.db")
+  if err != nil {
+    fmt.Printf("Error initializing camellia - %v", err)
+    os.Exit(1)
+  }
 
-	// Set a string value
-	cml.SetValue("/status/userIdentifier", "ABCDEF123456")
+  // Set a string value
+  cml.SetValue("/status/userIdentifier", "ABCDEF123456")
 
-	// Set a boolean value
-	cml.SetValue("/status/system/areWeOk", true)
+  // Set a boolean value
+  cml.SetValue("/status/system/areWeOk", true)
 
-	// Set a float value
-	cml.SetValue("/sensors/temperature/latestValue", -48.0)
+  // Set a float value
+  cml.SetValue("/sensors/temperature/latestValue", -48.0)
 
-	// Set an integer value
-	cml.SetValue("/sensors/saturation/latestValue", 99)
+  // Set an integer value
+  cml.SetValue("/sensors/saturation/latestValue", 99)
 
-	// TODO: Set a custom struct. See issues, may be supported in future
+  // Read a single float64 value
+  temp, err := cml.GetValue[float64]("/sensors/temperature/latestValue")
+  fmt.Printf("Last temperature is: %f", temp)
 
-	// Read a single value
-	temp, err := cml.GetValue[float64]("/sensors/temperature/latestValue")
-	fmt.Printf("Last temperature is: %f", temp)
+  // Read a single bool value
+  ok, err := cml.GetValue[bool]("/sensors/temperature/latestValue")
+  fmt.Printf("Are we ok? %t", ok)
 
-	// Read a tree of entries
-	entry, err := cml.GetEntries("/sensors")
-	fmt.Printf("Last update date of saturation value: %v", entry.Children["saturation"].LastUpdate)
+  // Read a tree of entries
+  entry, err := cml.GetEntries("/sensors")
+  fmt.Printf("Last update date of saturation value: %v", entry.Children["saturation"].LastUpdate)
 
-	// Export whole DB as JSON
-	j, err := cml.ValuesToJSON("/")
-	fmt.Printf("All DB values:\n%s", j)
+  // Export whole DB as JSON
+  j, err := cml.ValuesToJSON("/")
+  fmt.Printf("All DB values:\n%s", j)
 
-	// Import DB from JSON file
-	file, err := os.Open("db.json")
-	cml.SetValuesFromJSON(file, false)
+  // Import DB from JSON file
+  file, err := os.Open("db.json")
+  cml.SetValuesFromJSON(file, false)
+
+  // Register a callback called after a value is set
+  cml.SetPostSetHook("/status/system/areWeOk", func(path, value string) error {
+    if value == "true" {
+        fmt.Printf("System went back to normal")
+    } else {
+        fmt.Printf("Something bad happened")
+    }
+
+    return nil
+  }, true)
 }
 
 ```
@@ -336,9 +349,9 @@ Hooks can be synchronous or asynchronous:
 
 ---
 
-## `cml` utility
+## `cml` command
 
-## Command at a glance
+## Command line at a glance
 
 ```sh
 # Set some values
@@ -353,6 +366,7 @@ cml get /sensors/temperature/latestValue
 
 # Get some values
 cml get /sensors
+
 # {
 #   "saturation": {
 #       "latestValue": "99"
@@ -364,6 +378,7 @@ cml get /sensors
 
 # Get Entries in the extended format
 cml get -e sensors/temperature
+
 # {
 #    "last_update_ms": "1641453582957",
 #    "children": {
