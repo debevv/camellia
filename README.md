@@ -38,7 +38,7 @@ import (
 )
 
 func main() {
-	_, err := cml.Init("/home/debevv/camellia.db")
+	_, err := cml.Open("/home/debevv/camellia.db")
 	if err != nil {
 		fmt.Printf("Error initializing camellia - %v", err)
 		os.Exit(1)
