@@ -34,13 +34,8 @@ type Stringable interface {
 	BaseType
 }
 
-type DBEntry struct {
-	ID   int64
-	Name string
-}
-
 type Entry struct {
-	DBEntry
+	Path       string
 	LastUpdate time.Time
 	IsValue    bool
 	Value      string
@@ -138,7 +133,7 @@ func SetValue[T Stringable](path string, value T) error {
 		return fmt.Errorf("error beginning transaction - %w", err)
 	}
 
-	err = setValue(path, fmt.Sprint(value), tx, false, false)
+	err = setValue(normalizePath(path), fmt.Sprint(value), tx, false, false)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -166,7 +161,7 @@ func ForceValue[T Stringable](path string, value T) error {
 		return fmt.Errorf("error beginning transaction - %w", err)
 	}
 
-	err = setValue(path, fmt.Sprint(value), tx, true, false)
+	err = setValue(normalizePath(path), fmt.Sprint(value), tx, true, false)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -194,7 +189,7 @@ func SetValueOrPanic[T Stringable](path string, value T) {
 		panic(fmt.Errorf("error beginning transaction - %w", err))
 	}
 
-	err = setValue(path, fmt.Sprint(value), tx, false, false)
+	err = setValue(normalizePath(path), fmt.Sprint(value), tx, false, false)
 	if err != nil {
 		tx.Rollback()
 		panic(err)
@@ -220,7 +215,7 @@ func ForceValueOrPanic[T Stringable](path string, value T) {
 		panic(fmt.Errorf("error beginning transaction - %w", err))
 	}
 
-	err = setValue(path, fmt.Sprint(value), tx, true, false)
+	err = setValue(normalizePath(path), fmt.Sprint(value), tx, true, false)
 	if err != nil {
 		tx.Rollback()
 		panic(err)
@@ -248,7 +243,7 @@ func GetValue[T Stringable](path string) (T, error) {
 		return value, fmt.Errorf("error beginning transaction - %w", err)
 	}
 
-	valueString, err := getValue(path, tx)
+	valueString, err := getValue(normalizePath(path), tx)
 	if err != nil {
 		tx.Rollback()
 		return value, err
@@ -284,7 +279,7 @@ func GetValueOrPanic[T Stringable](path string) T {
 		panic(fmt.Errorf("error beginning transaction - %w", err))
 	}
 
-	valueString, err := getValue(path, tx)
+	valueString, err := getValue(normalizePath(path), tx)
 	if err != nil {
 		tx.Rollback()
 		panic(err)
@@ -320,7 +315,7 @@ func GetValueOrPanicEmpty[T Stringable](path string) T {
 		panic(fmt.Errorf("error beginning transaction - %w", err))
 	}
 
-	valueString, err := getValue(path, tx)
+	valueString, err := getValue(normalizePath(path), tx)
 	if err != nil {
 		tx.Rollback()
 		panic(fmt.Errorf("error getting value %s - %w", path, err))
@@ -346,11 +341,11 @@ func GetValueOrPanicEmpty[T Stringable](path string) T {
 	return value
 }
 
-func GetEntries(path string) (*Entry, error) {
-	return GetEntriesDepth(path, -1)
+func GetEntry(path string) (*Entry, error) {
+	return GetEntryDepth(path, -1)
 }
 
-func GetEntriesDepth(path string, depth int) (*Entry, error) {
+func GetEntryDepth(path string, depth int) (*Entry, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -363,7 +358,7 @@ func GetEntriesDepth(path string, depth int) (*Entry, error) {
 		return nil, fmt.Errorf("error beginning transaction - %w", err)
 	}
 
-	entry, err := getEntry(path, tx, depth)
+	entry, err := getEntryDepth(normalizePath(path), depth, tx)
 	if err != nil {
 		tx.Rollback()
 		return nil, err
@@ -391,24 +386,46 @@ func Exists(path string) (bool, error) {
 		return false, fmt.Errorf("error beginning transaction - %w", err)
 	}
 
-	_, _, err = getPathRowID(path, tx)
+	exists, err := exists(normalizePath(path), tx)
 	if err != nil {
-		if errors.Is(err, ErrPathNotFound) {
-			tx.Commit()
-			return false, nil
-		} else {
-			tx.Rollback()
-			return false, err
-		}
-	} else {
-		err = tx.Commit()
-		if err != nil {
-			tx.Rollback()
-			return false, fmt.Errorf("error committing transaction - %w", err)
-		}
-
-		return true, nil
+		tx.Rollback()
+		return false, err
 	}
+
+	err = tx.Commit()
+	if err != nil {
+		tx.Rollback()
+		return false, fmt.Errorf("error committing transaction - %w", err)
+	}
+
+	return exists, nil
+}
+
+func Recurse(path string, depth int, cb func(entry *Entry, parent *Entry, depth uint) error) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if atomic.LoadInt32(&initialized) == 0 {
+		return ErrNotInitialized
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("error beginning transaction - %w", err)
+	}
+
+	err = recurse(normalizePath(path), depth, cb, tx)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("error committing transaction - %w", err)
+	}
+
+	return nil
 }
 
 func DeleteEntry(path string) error {
@@ -424,13 +441,7 @@ func DeleteEntry(path string) error {
 		return fmt.Errorf("error beginning transaction - %w", err)
 	}
 
-	id, _, err := getPathRowID(path, tx)
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	err = deleteEntry(id, tx)
+	err = deleteEntry(normalizePath(path), tx)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -457,13 +468,13 @@ func Wipe() error {
 		return fmt.Errorf("error beginning transaction - %w", err)
 	}
 
-	root, err := getEntry("/", tx, 1)
+	root, err := getEntryDepth(normalizePath(""), 1, tx)
 	if err != nil {
 		return err
 	}
 
 	for _, child := range root.Children {
-		err = deleteEntry(child.ID, tx)
+		err = deleteEntry(child.Path, tx)
 		if err != nil {
 			tx.Rollback()
 			return err

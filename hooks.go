@@ -87,11 +87,11 @@ func callHooks(path string, value string, hT hookType) error {
 	return nil
 }
 
-func callPreSetHook(path string, value string) error {
+func callPreSetHooks(path string, value string) error {
 	return callHooks(path, value, hookTypePre)
 }
 
-func callPostSetHook(path string, value string) error {
+func callPostSetHooks(path string, value string) error {
 	return callHooks(path, value, hookTypePost)
 }
 

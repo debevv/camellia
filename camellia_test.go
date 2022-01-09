@@ -63,7 +63,18 @@ func TestMain(m *testing.M) {
 	testDBPath = testDBFile.Name()
 	testDBFile.Close()
 
+	_, err = Init(testDBPath)
+	if err != nil {
+		os.Exit(1)
+	}
+
 	ret := m.Run()
+
+	err = Close()
+	if err != nil {
+		os.Exit(1)
+	}
+
 	os.RemoveAll(testDBPath)
 	os.Exit(ret)
 }
@@ -108,17 +119,19 @@ func TestSetGet(t *testing.T) {
 		t.FailNow()
 	}
 
+	t.Log("Should return ErrPathInvalid on forcing the value of empty path")
 	err = ForceValue("", "a")
 	if err != ErrPathInvalid {
 		t.FailNow()
 	}
 
-	t.Log("Should return ErrPathInvalid on setting the value of root path")
+	t.Log("Should return ErrPathIsNotAValue on setting the value of / path")
 	err = SetValue("/", "a")
 	if err != ErrPathInvalid {
 		t.FailNow()
 	}
 
+	t.Log("Should return ErrPathInvalid on forcing the value of / path")
 	err = ForceValue("/", "a")
 	if err != ErrPathInvalid {
 		t.FailNow()
@@ -137,6 +150,12 @@ func TestSetGet(t *testing.T) {
 
 	t.Log("Should return ErrPathIsNotAValue on getting the value of an entry that is not a value")
 	_, err = GetValue[string]("/a/b")
+	if err != ErrPathIsNotAValue {
+		t.FailNow()
+	}
+
+	t.Log("Should return ErrPathIsNotAValue on setting the value of an entry that is not a value")
+	err = SetValue("/a/b", "b")
 	if err != ErrPathIsNotAValue {
 		t.FailNow()
 	}
@@ -208,6 +227,57 @@ func TestSetGet(t *testing.T) {
 
 	err = catchPanic(t, "/empty", GetValueOrPanicEmpty[string])
 	if !errors.Is(err, ErrValueEmpty) {
+		t.FailNow()
+	}
+
+	t.Log("Should get an entry and all of its children")
+	resetDB(t)
+
+	err = SetValue("/a1/b1/c1/d1", "d")
+	check(err, t)
+
+	err = SetValue("/a1/b1/c2/d1", "d")
+	check(err, t)
+
+	a1, err := GetEntry("/a1")
+	check(err, t)
+
+	if a1.Children["b1"] == nil {
+		t.FailNow()
+	}
+
+	if a1.Children["b1"].Children["c1"] == nil {
+		t.FailNow()
+	}
+
+	if a1.Children["b1"].Children["c2"] == nil {
+		t.FailNow()
+	}
+
+	if a1.Children["b1"].Children["c1"].Children["d1"] == nil {
+		t.FailNow()
+	}
+
+	if a1.Children["b1"].Children["c2"].Children["d1"] == nil {
+		t.FailNow()
+	}
+
+	t.Log("Should and entry and it children until a certain depth")
+	a1, err = GetEntryDepth("/a1", 0)
+	check(err, t)
+
+	if len(a1.Children) > 0 {
+		t.FailNow()
+	}
+
+	a1, err = GetEntryDepth("/a1", 1)
+	check(err, t)
+
+	if a1.Children["b1"] == nil {
+		t.FailNow()
+	}
+
+	if len(a1.Children["b1"].Children) > 0 {
 		t.FailNow()
 	}
 }
@@ -289,7 +359,7 @@ func TestDelete(t *testing.T) {
 	err = Wipe()
 	check(err, t)
 
-	root, err := GetEntries("")
+	root, err := GetEntry("")
 	check(err, t)
 
 	if len(root.Children) != 0 {

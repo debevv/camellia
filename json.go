@@ -21,7 +21,7 @@ func (e *Entry) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	return e.fromJSONInterface("", jEntry)
+	return e.fromJSONInterface("/", jEntry)
 }
 
 func (e Entry) MarshalJSON() ([]byte, error) {
@@ -32,8 +32,8 @@ func (e Entry) MarshalJSON() ([]byte, error) {
 		jEntry[propValue] = e.Value
 	} else {
 		children := make(map[string]interface{})
-		for _, child := range e.Children {
-			children[child.Name] = child
+		for name, child := range e.Children {
+			children[name] = child
 		}
 
 		jEntry[propChildren] = children
@@ -64,7 +64,7 @@ func ValuesToJSON(path string) (string, error) {
 		return "", fmt.Errorf("error beginning transaction - %w", err)
 	}
 
-	entry, err := getEntry(path, tx, -1)
+	entry, err := getEntryDepth(path, -1, tx)
 	if err != nil {
 		tx.Rollback()
 		return "", err
@@ -103,7 +103,7 @@ func EntryToJSON(path string) (string, error) {
 		return "", fmt.Errorf("error beginning transaction - %w", err)
 	}
 
-	entry, err := getEntry(path, tx, -1)
+	entry, err := getEntryDepth(path, -1, tx)
 	if err != nil {
 		tx.Rollback()
 		return "", err
@@ -241,16 +241,18 @@ func entryToJSONValues(entry *Entry) interface{} {
 		return entry.Value
 	} else {
 		jEntry := make(map[string]interface{})
-		for _, child := range entry.Children {
-			jEntry[child.Name] = entryToJSONValues(child)
+		for name, child := range entry.Children {
+			jEntry[name] = entryToJSONValues(child)
 		}
 
 		return &jEntry
 	}
 }
 
-func (e *Entry) fromJSONInterface(name string, i map[string]interface{}) error {
-	e.Name = name
+func (e *Entry) fromJSONInterface(path string, i map[string]interface{}) error {
+	path = normalizePath(path)
+
+	e.Path = path
 	e.LastUpdate = time.Now()
 
 	if i[propValue] != nil && i[propChildren] != nil {
@@ -279,8 +281,10 @@ func (e *Entry) fromJSONInterface(name string, i map[string]interface{}) error {
 			if !ok {
 				return fmt.Errorf("invalid children field")
 			}
+
 			entry := Entry{}
-			err := entry.fromJSONInterface(name, itfChild)
+			p := append(splitPath(path), name)
+			err := entry.fromJSONInterface(joinPath(p), itfChild)
 			if err != nil {
 				return err
 			}
