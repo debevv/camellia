@@ -13,9 +13,16 @@ import (
 
 var testDBPath string
 
+const currentDBVersion = 1
+
 func resetDB(t *testing.T) {
 	if Initialized() {
-		err := Close()
+		_, err := Init("")
+		if err != nil {
+			t.FailNow()
+		}
+
+		err = Close()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -27,13 +34,43 @@ func resetDB(t *testing.T) {
 		}
 	}
 
+	err := Close()
+	if err != ErrNotInitialized {
+		t.FailNow()
+	}
+
+	if Initialized() {
+		t.FailNow()
+	}
+
+	if GetDBPath() != "" {
+		t.FailNow()
+	}
+
+	_, err = Init("")
+	if err == nil {
+		t.FailNow()
+	}
+
 	created, err := Init(testDBPath)
 	if !created || err != nil {
 		t.Fatal(err)
 	}
+
+	if !Initialized() {
+		t.FailNow()
+	}
+
+	if GetDBPath() != testDBPath {
+		t.FailNow()
+	}
+
+	if GetSupportedDBVersion() != currentDBVersion {
+		t.FailNow()
+	}
 }
 
-func catchPanic[P any, R any](t *testing.T, p P, f func(P) R) (err error) {
+func catchPanicGet[P any, R any](t *testing.T, p P, f func(P) R) (err error) {
 	defer func() {
 		r := recover()
 		var ok bool
@@ -44,6 +81,20 @@ func catchPanic[P any, R any](t *testing.T, p P, f func(P) R) (err error) {
 	}()
 
 	f(p)
+	return
+}
+
+func catchPanicSet[P any](t *testing.T, p1 P, p2 P, f func(P, P)) (err error) {
+	defer func() {
+		r := recover()
+		var ok bool
+		err, ok = r.(error)
+		if !ok {
+			t.FailNow()
+		}
+	}()
+
+	f(p1, p2)
 	return
 }
 
@@ -215,18 +266,32 @@ func TestSetGet(t *testing.T) {
 
 	t.Log("Should panic on GetValueOrPanic error")
 
-	err = catchPanic(t, "/nonexisting", GetValueOrPanic[string])
+	err = catchPanicGet(t, "/nonexisting", GetValueOrPanic[string])
 	if !errors.Is(err, ErrPathNotFound) {
 		t.FailNow()
 	}
 
 	t.Log("Should panic on getting empty value with GetValueOrPanicEmpty")
 
-	err = SetValue("empty", "")
+	err = SetValue("/empty", "")
 	check(err, t)
 
-	err = catchPanic(t, "/empty", GetValueOrPanicEmpty[string])
+	err = catchPanicGet(t, "/empty", GetValueOrPanicEmpty[string])
 	if !errors.Is(err, ErrValueEmpty) {
+		t.FailNow()
+	}
+
+	t.Log("Should panic with error on SetValueOrPanic")
+
+	err = catchPanicSet(t, "", "error", SetValueOrPanic[string])
+	if !errors.Is(err, ErrPathInvalid) {
+		t.FailNow()
+	}
+
+	t.Log("Should panic with error on ForceValueOrPanic")
+
+	err = catchPanicSet(t, "", "error", ForceValueOrPanic[string])
+	if !errors.Is(err, ErrPathInvalid) {
 		t.FailNow()
 	}
 
@@ -464,6 +529,83 @@ func TestTypedSetGet(t *testing.T) {
 		}
 
 	*/
+}
+
+func TestRecurse(t *testing.T) {
+	t.Log("Should recurse on an entry and on all of its children")
+	resetDB(t)
+
+	err := SetValue("/a1/b1/c1/d1", "d")
+	check(err, t)
+
+	err = SetValue("/a1/b1/c2/d1", "d")
+	check(err, t)
+
+	err = SetValue("/a2", "a")
+	check(err, t)
+
+	visited := map[string]bool{}
+
+	err = Recurse("/a1", -1, func(entry, parent *Entry, depth uint) error {
+		visited[entry.Path] = true
+		return nil
+	})
+
+	check(err, t)
+
+	if len(visited) != 6 {
+		t.FailNow()
+	}
+
+	if !visited["a1"] || !visited["a1/b1"] || !visited["a1/b1/c1"] || !visited["a1/b1/c1/d1"] ||
+		!visited["a1/b1/c2"] || !visited["a1/b1/c2/d1"] {
+		t.FailNow()
+	}
+
+	t.Log("Should recurse on an entry and on all of its children until a certain depth")
+	resetDB(t)
+
+	err = SetValue("/a1/b1/c1/d1", "d")
+	check(err, t)
+
+	err = SetValue("/a1/b1/c2/d1", "d")
+	check(err, t)
+
+	err = SetValue("/a2", "a")
+	check(err, t)
+
+	visited = map[string]bool{}
+
+	err = Recurse("/a1", 1, func(entry, parent *Entry, depth uint) error {
+		visited[entry.Path] = true
+		return nil
+	})
+
+	check(err, t)
+
+	if len(visited) != 2 {
+		t.FailNow()
+	}
+
+	if !visited["a1"] || !visited["a1/b1"] {
+		t.FailNow()
+	}
+
+	t.Log("Should report the error of the recurse callback")
+	resetDB(t)
+
+	err = SetValue("a2", "a")
+	check(err, t)
+
+	myError := fmt.Errorf("error1234")
+
+	err = Recurse("a2", 1, func(entry, parent *Entry, depth uint) error {
+		return myError
+	})
+
+	if !errors.Is(err, myError) {
+		t.FailNow()
+	}
 }
 
 func TestToJSON(t *testing.T) {
@@ -747,22 +889,26 @@ func TestFromJson(t *testing.T) {
 	}
 }
 
-func TestHooks(t *testing.T) {
-	t.Log("Should call pre and post set hooks")
-
+func testHooks(t *testing.T, shouldBeCalled bool) {
 	resetDB(t)
 
-	var path = "a/b/hook"
+	wipeHooks()
+
+	var p = "a/b/hook"
 	const v = "called"
 
-	err := SetValue(path, "a")
+	err := SetValue(p, "a")
 	check(err, t)
 
 	var preCalled, postCalled bool
 
-	SetPreSetHook(path, func(path, value string) error {
+	SetPreSetHook(p, func(path, value string) error {
 		if value != v {
 			return fmt.Errorf("hook value is different")
+		}
+
+		if path != p {
+			return fmt.Errorf("hook path is different")
 		}
 
 		preCalled = true
@@ -770,9 +916,13 @@ func TestHooks(t *testing.T) {
 		return nil
 	})
 
-	SetPostSetHook(path, func(path, value string) error {
+	SetPostSetHook(p, func(path, value string) error {
 		if value != v {
 			return fmt.Errorf("hook value is different")
+		}
+
+		if path != p {
+			return fmt.Errorf("hook path is different")
 		}
 
 		postCalled = true
@@ -780,10 +930,10 @@ func TestHooks(t *testing.T) {
 		return nil
 	}, false)
 
-	err = SetValue(path, v)
+	err = SetValue(p, v)
 	check(err, t)
 
-	if !preCalled || !postCalled {
+	if shouldBeCalled != preCalled || shouldBeCalled != postCalled {
 		t.FailNow()
 	}
 
@@ -791,13 +941,17 @@ func TestHooks(t *testing.T) {
 
 	resetDB(t)
 
-	path = "a/b/asyncHook"
+	p = "a/b/asyncHook"
 	postCalled = false
 	c := make(chan interface{})
 
-	SetPostSetHook(path, func(path, value string) error {
+	SetPostSetHook(p, func(path, value string) error {
 		if value != v {
 			return fmt.Errorf("hook value is different")
+		}
+
+		if path != p {
+			return fmt.Errorf("hook path is different")
 		}
 
 		postCalled = true
@@ -806,7 +960,7 @@ func TestHooks(t *testing.T) {
 		return nil
 	}, true)
 
-	err = SetValue(path, v)
+	err = SetValue(p, v)
 	check(err, t)
 
 	timer := time.NewTimer(1 * time.Second)
@@ -816,8 +970,21 @@ func TestHooks(t *testing.T) {
 	case <-c:
 	}
 
-	if !postCalled {
+	if shouldBeCalled != postCalled {
 		t.FailNow()
 	}
 
+}
+
+func TestHooks(t *testing.T) {
+	t.Log("Should call hooks by default")
+	testHooks(t, true)
+
+	t.Log("Should not call hooks")
+	SetHooksEnabled(false)
+	testHooks(t, false)
+
+	t.Log("Should call hooks")
+	SetHooksEnabled(true)
+	testHooks(t, true)
 }
