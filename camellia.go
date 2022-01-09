@@ -62,6 +62,8 @@ func Init(path string) (bool, error) {
 		return false, nil
 	}
 
+	wipeHooks()
+
 	created, err := openDB(path)
 	if err != nil {
 		return false, fmt.Errorf("error opening DB - %w", err)
@@ -84,6 +86,8 @@ func Close() error {
 	if err != nil {
 		return fmt.Errorf("error closing DB - %w", err)
 	}
+
+	wipeHooks()
 
 	atomic.StoreInt32(&initialized, 0)
 

@@ -2,6 +2,7 @@ package camellia
 
 import (
 	"fmt"
+	"sync"
 	"sync/atomic"
 )
 
@@ -22,6 +23,7 @@ var hooksEnabled = uint32(1)
 var hooksEmpty = uint32(1)
 
 var hooks = map[hookType]map[string][]*hook{}
+var hooksMutex sync.Mutex
 
 func SetHooksEnabled(enabled bool) {
 	if enabled {
@@ -32,8 +34,8 @@ func SetHooksEnabled(enabled bool) {
 }
 
 func SetPreSetHook(path string, callback func(path string, value string) error) error {
-	mutex.Lock()
-	defer mutex.Unlock()
+	hooksMutex.Lock()
+	defer hooksMutex.Unlock()
 
 	if atomic.LoadInt32(&initialized) == 0 {
 		return ErrNotInitialized
@@ -43,8 +45,8 @@ func SetPreSetHook(path string, callback func(path string, value string) error) 
 }
 
 func SetPostSetHook(path string, callback func(path string, value string) error, async bool) error {
-	mutex.Lock()
-	defer mutex.Unlock()
+	hooksMutex.Lock()
+	defer hooksMutex.Unlock()
 
 	if atomic.LoadInt32(&initialized) == 0 {
 		return ErrNotInitialized
@@ -85,6 +87,13 @@ func callHooks(path string, value string, hT hookType) error {
 	}
 
 	return nil
+}
+
+func wipeHooks() {
+	hooksMutex.Lock()
+	defer hooksMutex.Unlock()
+
+	hooks = map[hookType]map[string][]*hook{}
 }
 
 func callPreSetHooks(path string, value string) error {
