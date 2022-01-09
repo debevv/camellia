@@ -1,8 +1,9 @@
 # camellia 💮 A lightweight, persistent, hierarchical key-value store
 
-`camellia` is a Go library that implements a hierarchical, persistent key-value store, backed by a SQLite database. Its minimal footprint (just a single `.db` file) makes it suitable for usage in embedded systems, or simply as a minimalist application settings container.  
+`camellia` is a Go library that implements a hierarchical, persistent key-value store, backed by a SQLite database.  
+Its minimal footprint (just a single `.db` file) makes it suitable for usage in embedded systems, or simply as a minimalist application settings container.  
 Additionally, this repository contains the companion `cml` command line utility, useful to read, write and import/export a `camellia` DB.  
-The project was born to be the system-wide settings registry of a Linux embedded system, similar to the one found in Windows.
+The project was born to be the system-wide settings registry of a Linux embedded device, similar to the one found in Windows.
 
 - Library
 
@@ -44,31 +45,31 @@ func main() {
   }
 
   // Set a string value
-  cml.SetValue("/status/userIdentifier", "ABCDEF123456")
+  cml.SetValue("status/userIdentifier", "ABCDEF123456")
 
   // Set a boolean value
-  cml.SetValue("/status/system/areWeOk", true)
+  cml.SetValue("status/system/areWeOk", true)
 
   // Set a float value
-  cml.SetValue("/sensors/temperature/latestValue", -48.0)
+  cml.SetValue("sensors/temperature/latestValue", -48.0)
 
   // Set an integer value
-  cml.SetValue("/sensors/saturation/latestValue", 99)
+  cml.SetValue("sensors/saturation/latestValue", 99)
 
   // Read a single float64 value
-  temp, err := cml.GetValue[float64]("/sensors/temperature/latestValue")
+  temp, err := cml.GetValue[float64]("sensors/temperature/latestValue")
   fmt.Printf("Last temperature is: %f", temp)
 
   // Read a single bool value
-  ok, err := cml.GetValue[bool]("/sensors/temperature/latestValue")
+  ok, err := cml.GetValue[bool]("sensors/temperature/latestValue")
   fmt.Printf("Are we ok? %t", ok)
 
   // Read a tree of entries
-  entry, err := cml.GetEntries("/sensors")
+  entry, err := cml.GetEntries("sensors")
   fmt.Printf("Last update date of saturation value: %v", entry.Children["saturation"].LastUpdate)
 
   // Export whole DB as JSON
-  j, err := cml.ValuesToJSON("/")
+  j, err := cml.ValuesToJSON("")
   fmt.Printf("All DB values:\n%s", j)
 
   // Import DB from JSON file
@@ -76,7 +77,7 @@ func main() {
   cml.SetValuesFromJSON(file, false)
 
   // Register a callback called after a value is set
-  cml.SetPostSetHook("/status/system/areWeOk", func(path, value string) error {
+  cml.SetPostSetHook("status/system/areWeOk", func(path, value string) error {
     if value == "true" {
         fmt.Printf("System went back to normal")
     } else {
@@ -85,6 +86,9 @@ func main() {
 
     return nil
   }, true)
+
+  // Close the DB
+  cml.Close()
 }
 
 ```
@@ -116,6 +120,7 @@ The data model is extremely simple.
 Every entity in the DB is ab `Entry`. An `Entry` has the following properties:
 
 ```go
+Path       string
 LastUpdate time.Time
 IsValue    bool
 ```
@@ -132,11 +137,11 @@ When `IsValue == false`, the `Entry` does not carry a value, but it can have `Ch
 Children map[string]*Entry
 ```
 
-This leads to the complete definition an `Entry`, excluding the DB-specific properties:
+This leads to the complete definition an `Entry`:
 
 ```go
 type Entry struct {
-	DBEntry
+	Path       string
 	LastUpdate time.Time
 	IsValue    bool
 	Value      string
@@ -147,8 +152,26 @@ type Entry struct {
 ### Paths
 
 Paths are defined as strings separated by slashes (`/`). At the moment of writing this document, no limits are imposed to the length of a segment or to the length of the full path.  
-The root Entry is identified as a single slash `/`.  
-When specifying a path, the initial slash can be omitted, so, for example, `my/path` is equivalent to `/my/path`, and and an empty string is equivalent to `/`.
+The root Entry is identified by an empty string.  
+When specifying a path, additional slashes are automatically ignored, so, for example
+
+```
+/my/path
+```
+
+or
+
+```
+///my///path//
+```
+
+are equivalent to
+
+```
+my/path
+```
+
+and an an empty string is equivalent to `/` or `////`.
 
 ### Database versioning and migration
 
@@ -218,7 +241,7 @@ Please refer to this [comment](https://github.com/golang/go/issues/45346#issueco
 Entries can be imported/exported from/to JSON.  
 Two different formats are supported:
 
-- **Default**: meant to represent only the hierarchical relationship of Entries and their values. This will be the format used in most cases:
+- **Default**: meant to represent just the hierarchical relationship of Entries and their values. This will be the format used in most cases:
 
 ```json
 {
@@ -316,7 +339,7 @@ Hooks are callback methods that can be registered to run before (pre) and after 
 
 ```go
 // Register a pre set hook to check the value before it is set
-cml.SetPreSetHook("/sensors/temperature/saturation", func(path, value string) error {
+cml.SetPreSetHook("sensors/temperature/saturation", func(path, value string) error {
     saturation, err := strconv.Atoi(value)
     if err != nil {
         return fmt.Errorf("invalid saturation value")
@@ -331,7 +354,7 @@ cml.SetPreSetHook("/sensors/temperature/saturation", func(path, value string) er
 })
 
 // Register an async post set hook and react to changes
-cml.SetPostSetHook("/status/system/areWeOk", func(path, value string) error {
+cml.SetPostSetHook("status/system/areWeOk", func(path, value string) error {
     if value == "true" {
         fmt.Printf("System went back to normal")
     } else {
@@ -358,14 +381,14 @@ Hooks can be synchronous or asynchronous:
 cml set status/userIdentifier "ABCDEF123456"
 cml set /status/system/areWeOk "true"
 cml set "sensors/saturation/latestValue" 99
-cml set /sensors/temperature/latestValue "-48.0"
+cml set sensors/temperature/latestValue "-48.0"
 
 # Get a value
-cml get /sensors/temperature/latestValue
+cml get sensors/temperature/latestValue
 # -48.0
 
 # Get some values
-cml get /sensors
+cml get sensors
 
 # {
 #   "saturation": {
@@ -394,7 +417,7 @@ cml get -v sensors
 # Error getting value - path is not a value
 
 # Merge values from JSON file
-cml merge path/to/file.json
+cml merge /path/to/file.json
 ```
 
 ## Installation
