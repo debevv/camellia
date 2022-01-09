@@ -111,7 +111,7 @@ func initialize() {
 	}
 
 	if created {
-		printStderrLn("Created new DB file at %s - version %d", dbPath, cml.GetSupportedDBVersion())
+		printStderrLn("Created new DB file at %s - version %d", dbPath, cml.GetSupportedDBSchemaVersion())
 	}
 
 	initialized = true
@@ -252,15 +252,18 @@ func run() int {
 		}
 
 	case "migrate":
-		initialize()
+		dbPath, err := getDBPath()
+		if err != nil {
+			os.Exit(errExit("Error getting DB path from environment - %v", err))
+		}
 
-		migrated, err := cml.Migrate()
+		migrated, err := cml.Migrate(dbPath)
 		if err != nil {
 			return errExit("Error migrating DB - %v", err)
 		}
 
 		if migrated {
-			printStderrLn("Migrated DB to version %d", cml.GetSupportedDBVersion())
+			printStderrLn("Migrated DB to version %d", cml.GetSupportedDBSchemaVersion())
 		}
 
 	case "wipe":

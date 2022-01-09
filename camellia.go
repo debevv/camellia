@@ -103,9 +103,18 @@ func IsOpen() bool {
 	}
 }
 
-func Migrate() (bool, error) {
+func Migrate(dbPath string) (bool, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
+
+	created, err := Open(dbPath)
+	if err != nil {
+		return false, err
+	}
+
+	if created {
+		return true, nil
+	}
 
 	return migrate()
 }
@@ -117,7 +126,7 @@ func GetDBPath() string {
 	return dbPath
 }
 
-func GetSupportedDBVersion() uint64 {
+func GetSupportedDBSchemaVersion() uint64 {
 	mutex.Lock()
 	defer mutex.Unlock()
 

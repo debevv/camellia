@@ -65,7 +65,7 @@ func resetDB(t *testing.T) {
 		t.FailNow()
 	}
 
-	if GetSupportedDBVersion() != currentDBVersion {
+	if GetSupportedDBSchemaVersion() != currentDBVersion {
 		t.FailNow()
 	}
 }
