@@ -97,7 +97,7 @@ func main() {
 
 ## API reference
 
-TBD
+https://pkg.go.dev/github.com/debevv/camellia#section-documentation
 
 ## Installation and prerequisites
 

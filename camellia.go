@@ -1,6 +1,6 @@
-// camellia is a hierarchical, persistent key-value store, backed by a SQLite database.
+// camellia is a lightweight, persistent, hierarchical key-value store.
 //
-// Its minimal footprint (just a single `.db` file) makes it suitable for usage in embedded systems, or simply as a minimalist application settings container.
+// Its minimal footprint (just a single SQLite .db file) makes it suitable for usage in embedded systems, or simply as a minimalist application settings container.
 //
 // For more info about usage and examples, see the README at https://github.com/debevv/camellia
 package camellia
