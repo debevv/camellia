@@ -54,7 +54,7 @@ var (
 var initialized = int32(0)
 var mutex sync.Mutex
 
-func Init(path string) (bool, error) {
+func Open(path string) (bool, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
 

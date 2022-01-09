@@ -101,7 +101,7 @@ func initialize() {
 		os.Exit(errExit("Error getting DB path from environment - %v", err))
 	}
 
-	created, err := cml.Init(dbPath)
+	created, err := cml.Open(dbPath)
 	if err != nil {
 		if errors.Is(err, cml.ErrDBVersionMismatch) {
 			os.Exit(errExit("DB version mismatch, needs migration (cml migrate)"))

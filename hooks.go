@@ -38,7 +38,7 @@ func SetPreSetHook(path string, callback func(path string, value string) error) 
 	defer hooksMutex.Unlock()
 
 	if atomic.LoadInt32(&initialized) == 0 {
-		return ErrNotInitialized
+		return ErrNoDB
 	}
 
 	return setHook(path, callback, false, hookTypePre)
@@ -49,7 +49,7 @@ func SetPostSetHook(path string, callback func(path string, value string) error,
 	defer hooksMutex.Unlock()
 
 	if atomic.LoadInt32(&initialized) == 0 {
-		return ErrNotInitialized
+		return ErrNoDB
 	}
 
 	return setHook(path, callback, async, hookTypePost)

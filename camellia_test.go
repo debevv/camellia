@@ -17,7 +17,7 @@ const currentDBVersion = 1
 
 func resetDB(t *testing.T) {
 	if Initialized() {
-		_, err := Init("")
+		_, err := Open("")
 		if err != nil {
 			t.FailNow()
 		}
@@ -35,7 +35,7 @@ func resetDB(t *testing.T) {
 	}
 
 	err := Close()
-	if err != ErrNotInitialized {
+	if err != ErrNoDB {
 		t.FailNow()
 	}
 
@@ -47,12 +47,12 @@ func resetDB(t *testing.T) {
 		t.FailNow()
 	}
 
-	_, err = Init("")
+	_, err = Open("")
 	if err == nil {
 		t.FailNow()
 	}
 
-	created, err := Init(testDBPath)
+	created, err := Open(testDBPath)
 	if !created || err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestMain(m *testing.M) {
 	testDBPath = testDBFile.Name()
 	testDBFile.Close()
 
-	_, err = Init(testDBPath)
+	_, err = Open(testDBPath)
 	if err != nil {
 		os.Exit(1)
 	}

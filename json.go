@@ -56,7 +56,7 @@ func ValuesToJSON(path string) (string, error) {
 	defer mutex.Unlock()
 
 	if atomic.LoadInt32(&initialized) == 0 {
-		return "", ErrNotInitialized
+		return "", ErrNoDB
 	}
 
 	tx, err := db.Begin()
@@ -95,7 +95,7 @@ func EntryToJSON(path string) (string, error) {
 	defer mutex.Unlock()
 
 	if atomic.LoadInt32(&initialized) == 0 {
-		return "", ErrNotInitialized
+		return "", ErrNoDB
 	}
 
 	tx, err := db.Begin()
@@ -132,7 +132,7 @@ func SetValuesFromJSON(reader io.Reader, onlyMerge bool) error {
 	defer mutex.Unlock()
 
 	if atomic.LoadInt32(&initialized) == 0 {
-		return ErrNotInitialized
+		return ErrNoDB
 	}
 
 	tx, err := db.Begin()
@@ -208,7 +208,7 @@ func SetEntriesFromJSON(reader io.Reader, onlyMerge bool) error {
 	defer mutex.Unlock()
 
 	if atomic.LoadInt32(&initialized) == 0 {
-		return ErrNotInitialized
+		return ErrNoDB
 	}
 
 	tx, err := db.Begin()
