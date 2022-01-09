@@ -16,7 +16,7 @@ var testDBPath string
 const currentDBVersion = 1
 
 func resetDB(t *testing.T) {
-	if Initialized() {
+	if IsOpen() {
 		_, err := Open("")
 		if err != nil {
 			t.FailNow()
@@ -39,7 +39,7 @@ func resetDB(t *testing.T) {
 		t.FailNow()
 	}
 
-	if Initialized() {
+	if IsOpen() {
 		t.FailNow()
 	}
 
@@ -57,7 +57,7 @@ func resetDB(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !Initialized() {
+	if !IsOpen() {
 		t.FailNow()
 	}
 

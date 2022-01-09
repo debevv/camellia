@@ -47,7 +47,7 @@ var (
 	ErrPathNotFound      = errors.New("path not found")
 	ErrPathIsNotAValue   = errors.New("path is not a value")
 	ErrValueEmpty        = errors.New("value is empty")
-	ErrNotInitialized    = errors.New("not initialized")
+	ErrNoDB              = errors.New("no DB currently opened")
 	ErrDBVersionMismatch = errors.New("DB version mismatch")
 )
 
@@ -79,7 +79,7 @@ func Close() error {
 	defer mutex.Unlock()
 
 	if atomic.LoadInt32(&initialized) == 0 {
-		return ErrNotInitialized
+		return ErrNoDB
 	}
 
 	err := closeDB()
@@ -94,7 +94,7 @@ func Close() error {
 	return nil
 }
 
-func Initialized() bool {
+func IsOpen() bool {
 	i := atomic.LoadInt32(&initialized)
 	if i == 0 {
 		return false
@@ -129,7 +129,7 @@ func Set[T Stringable](path string, value T) error {
 	defer mutex.Unlock()
 
 	if atomic.LoadInt32(&initialized) == 0 {
-		return ErrNotInitialized
+		return ErrNoDB
 	}
 
 	tx, err := db.Begin()
@@ -157,7 +157,7 @@ func Force[T Stringable](path string, value T) error {
 	defer mutex.Unlock()
 
 	if atomic.LoadInt32(&initialized) == 0 {
-		return ErrNotInitialized
+		return ErrNoDB
 	}
 
 	tx, err := db.Begin()
@@ -185,7 +185,7 @@ func SetOrPanic[T Stringable](path string, value T) {
 	defer mutex.Unlock()
 
 	if atomic.LoadInt32(&initialized) == 0 {
-		panic(ErrNotInitialized)
+		panic(ErrNoDB)
 	}
 
 	tx, err := db.Begin()
@@ -211,7 +211,7 @@ func ForceOrPanic[T Stringable](path string, value T) {
 	defer mutex.Unlock()
 
 	if atomic.LoadInt32(&initialized) == 0 {
-		panic(ErrNotInitialized)
+		panic(ErrNoDB)
 	}
 
 	tx, err := db.Begin()
@@ -239,7 +239,7 @@ func Get[T Stringable](path string) (T, error) {
 	var value T
 
 	if atomic.LoadInt32(&initialized) == 0 {
-		return value, ErrNotInitialized
+		return value, ErrNoDB
 	}
 
 	tx, err := db.Begin()
@@ -275,7 +275,7 @@ func GetOrPanic[T Stringable](path string) T {
 	var value T
 
 	if atomic.LoadInt32(&initialized) == 0 {
-		panic(ErrNotInitialized)
+		panic(ErrNoDB)
 	}
 
 	tx, err := db.Begin()
@@ -309,7 +309,7 @@ func GetOrPanicEmpty[T Stringable](path string) T {
 	defer mutex.Unlock()
 
 	if atomic.LoadInt32(&initialized) == 0 {
-		panic(ErrNotInitialized)
+		panic(ErrNoDB)
 	}
 
 	var value T
@@ -354,7 +354,7 @@ func GetEntryDepth(path string, depth int) (*Entry, error) {
 	defer mutex.Unlock()
 
 	if atomic.LoadInt32(&initialized) == 0 {
-		return nil, ErrNotInitialized
+		return nil, ErrNoDB
 	}
 
 	tx, err := db.Begin()
@@ -382,7 +382,7 @@ func Exists(path string) (bool, error) {
 	defer mutex.Unlock()
 
 	if atomic.LoadInt32(&initialized) == 0 {
-		return false, ErrNotInitialized
+		return false, ErrNoDB
 	}
 
 	tx, err := db.Begin()
@@ -410,7 +410,7 @@ func Recurse(path string, depth int, cb func(entry *Entry, parent *Entry, depth 
 	defer mutex.Unlock()
 
 	if atomic.LoadInt32(&initialized) == 0 {
-		return ErrNotInitialized
+		return ErrNoDB
 	}
 
 	tx, err := db.Begin()
@@ -437,7 +437,7 @@ func Delete(path string) error {
 	defer mutex.Unlock()
 
 	if atomic.LoadInt32(&initialized) == 0 {
-		return ErrNotInitialized
+		return ErrNoDB
 	}
 
 	tx, err := db.Begin()
@@ -464,7 +464,7 @@ func Wipe() error {
 	defer mutex.Unlock()
 
 	if atomic.LoadInt32(&initialized) == 0 {
-		return ErrNotInitialized
+		return ErrNoDB
 	}
 
 	tx, err := db.Begin()
