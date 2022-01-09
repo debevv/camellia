@@ -124,7 +124,7 @@ func GetSupportedDBVersion() uint64 {
 	return dbVersion
 }
 
-func SetValue[T Stringable](path string, value T) error {
+func Set[T Stringable](path string, value T) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -152,7 +152,7 @@ func SetValue[T Stringable](path string, value T) error {
 	return nil
 }
 
-func ForceValue[T Stringable](path string, value T) error {
+func Force[T Stringable](path string, value T) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -180,7 +180,7 @@ func ForceValue[T Stringable](path string, value T) error {
 	return nil
 }
 
-func SetValueOrPanic[T Stringable](path string, value T) {
+func SetOrPanic[T Stringable](path string, value T) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -206,7 +206,7 @@ func SetValueOrPanic[T Stringable](path string, value T) {
 	}
 }
 
-func ForceValueOrPanic[T Stringable](path string, value T) {
+func ForceOrPanic[T Stringable](path string, value T) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -232,7 +232,7 @@ func ForceValueOrPanic[T Stringable](path string, value T) {
 	}
 }
 
-func GetValue[T Stringable](path string) (T, error) {
+func Get[T Stringable](path string) (T, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -268,7 +268,7 @@ func GetValue[T Stringable](path string) (T, error) {
 	return value, nil
 }
 
-func GetValueOrPanic[T Stringable](path string) T {
+func GetOrPanic[T Stringable](path string) T {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -304,7 +304,7 @@ func GetValueOrPanic[T Stringable](path string) T {
 	return value
 }
 
-func GetValueOrPanicEmpty[T Stringable](path string) T {
+func GetOrPanicEmpty[T Stringable](path string) T {
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -432,7 +432,7 @@ func Recurse(path string, depth int, cb func(entry *Entry, parent *Entry, depth 
 	return nil
 }
 
-func DeleteEntry(path string) error {
+func Delete(path string) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 

@@ -135,58 +135,58 @@ func TestSetGet(t *testing.T) {
 
 	t.Log("Should set a value")
 
-	err := SetValue("////z////", "1")
+	err := Set("////z////", "1")
 	check(err, t)
 
-	v, err := GetValue[string]("z")
-	check(err, t)
-
-	if v != "1" {
-		t.FailNow()
-	}
-
-	v, err = GetValue[string]("//z///")
+	v, err := Get[string]("z")
 	check(err, t)
 
 	if v != "1" {
 		t.FailNow()
 	}
 
-	v, err = GetValue[string]("/z")
+	v, err = Get[string]("//z///")
 	check(err, t)
 
 	if v != "1" {
 		t.FailNow()
 	}
 
-	err = SetValue("y", "1")
-	check(err, t)
-
-	v, err = GetValue[string]("//y///")
+	v, err = Get[string]("/z")
 	check(err, t)
 
 	if v != "1" {
 		t.FailNow()
 	}
 
-	v, err = GetValue[string]("y///")
+	err = Set("y", "1")
+	check(err, t)
+
+	v, err = Get[string]("//y///")
 	check(err, t)
 
 	if v != "1" {
 		t.FailNow()
 	}
 
-	err = SetValue("y", "2")
+	v, err = Get[string]("y///")
 	check(err, t)
 
-	v, err = GetValue[string]("//y///")
+	if v != "1" {
+		t.FailNow()
+	}
+
+	err = Set("y", "2")
+	check(err, t)
+
+	v, err = Get[string]("//y///")
 	check(err, t)
 
 	if v != "2" {
 		t.FailNow()
 	}
 
-	v, err = GetValue[string]("y///")
+	v, err = Get[string]("y///")
 	check(err, t)
 
 	if v != "2" {
@@ -195,18 +195,18 @@ func TestSetGet(t *testing.T) {
 
 	resetDB(t)
 
-	err = SetValue("a/b///c/d", "d")
+	err = Set("a/b///c/d", "d")
 	check(err, t)
 
 	t.Log("Should read the same value as the previously set one")
-	v, err = GetValue[string]("/a/b/c///d/")
+	v, err = Get[string]("/a/b/c///d/")
 	check(err, t)
 
 	if v != "d" {
 		t.FailNow()
 	}
 
-	v, err = GetValue[string]("a/b/c/d")
+	v, err = Get[string]("a/b/c/d")
 	check(err, t)
 
 	if v != "d" {
@@ -214,60 +214,60 @@ func TestSetGet(t *testing.T) {
 	}
 
 	t.Log("Should return ErrPathIsNotAValue on getting the value of empty value (equals root path)")
-	_, err = GetValue[string]("")
+	_, err = Get[string]("")
 	if err != ErrPathIsNotAValue {
 		t.FailNow()
 	}
 
 	t.Log("Should return ErrPathIsNotAValue on getting the value of root path")
-	_, err = GetValue[string]("/")
+	_, err = Get[string]("/")
 	if err != ErrPathIsNotAValue {
 		t.FailNow()
 	}
 
 	t.Log("Should return ErrPathInvalid on setting the value of empty path")
-	err = SetValue("", "a")
+	err = Set("", "a")
 	if err != ErrPathInvalid {
 		t.FailNow()
 	}
 
 	t.Log("Should return ErrPathInvalid on forcing the value of empty path")
-	err = ForceValue("", "a")
+	err = Force("", "a")
 	if err != ErrPathInvalid {
 		t.FailNow()
 	}
 
 	t.Log("Should return ErrPathIsNotAValue on setting the value of / path")
-	err = SetValue("/", "a")
+	err = Set("/", "a")
 	if err != ErrPathInvalid {
 		t.FailNow()
 	}
 
 	t.Log("Should return ErrPathInvalid on forcing the value of / path")
-	err = ForceValue("/", "a")
+	err = Force("/", "a")
 	if err != ErrPathInvalid {
 		t.FailNow()
 	}
 
 	t.Log("Should return ErrPathNotFound on getting value at non-existing path")
-	_, err = GetValue[string]("/a/b/c/d/e")
+	_, err = Get[string]("/a/b/c/d/e")
 	if err != ErrPathNotFound {
 		t.FailNow()
 	}
 
-	_, err = GetValue[string]("/z")
+	_, err = Get[string]("/z")
 	if err != ErrPathNotFound {
 		t.FailNow()
 	}
 
 	t.Log("Should return ErrPathIsNotAValue on getting the value of an entry that is not a value")
-	_, err = GetValue[string]("/a/b")
+	_, err = Get[string]("/a/b")
 	if err != ErrPathIsNotAValue {
 		t.FailNow()
 	}
 
 	t.Log("Should return ErrPathIsNotAValue on setting the value of an entry that is not a value")
-	err = SetValue("/a/b", "b")
+	err = Set("/a/b", "b")
 	if err != ErrPathIsNotAValue {
 		t.FailNow()
 	}
@@ -275,16 +275,16 @@ func TestSetGet(t *testing.T) {
 	t.Log("Should overwrite a non-value entry with a value one, on user explicit choice")
 	resetDB(t)
 
-	err = SetValue("/a1/b1/c1/d1", "d")
+	err = Set("/a1/b1/c1/d1", "d")
 	check(err, t)
 
-	err = SetValue("/a1/b1/c2/d1", "d")
+	err = Set("/a1/b1/c2/d1", "d")
 	check(err, t)
 
-	err = ForceValue("/a1/b1", "b")
+	err = Force("/a1/b1", "b")
 	check(err, t)
 
-	v, err = GetValue[string]("/a1/b1")
+	v, err = Get[string]("/a1/b1")
 	check(err, t)
 
 	if v != "b" {
@@ -292,33 +292,33 @@ func TestSetGet(t *testing.T) {
 	}
 
 	t.Log("Should delete the children of an overwritten non-value entry")
-	_, err = GetValue[string]("/a1/b1/c1")
+	_, err = Get[string]("/a1/b1/c1")
 	if err != ErrPathNotFound {
 		t.FailNow()
 	}
 
-	_, err = GetValue[string]("/a1/b1/c1/d1")
+	_, err = Get[string]("/a1/b1/c1/d1")
 	if err != ErrPathNotFound {
 		t.FailNow()
 	}
 
-	_, err = GetValue[string]("/a1/b1/c2")
+	_, err = Get[string]("/a1/b1/c2")
 	if err != ErrPathNotFound {
 		t.FailNow()
 	}
 
-	_, err = GetValue[string]("/a1/b1/c2/d1")
+	_, err = Get[string]("/a1/b1/c2/d1")
 	if err != ErrPathNotFound {
 		t.FailNow()
 	}
 
 	t.Log("Should overwrite a value entry with a non-value one, on user explicit choice")
-	err = ForceValue("/a1/b1/c1/d1", "d")
+	err = Force("/a1/b1/c1/d1", "d")
 	if err != nil {
 		t.Fatal()
 	}
 
-	v, err = GetValue[string]("/a1/b1/c1/d1")
+	v, err = Get[string]("/a1/b1/c1/d1")
 	check(err, t)
 
 	if v != "d" {
@@ -327,31 +327,31 @@ func TestSetGet(t *testing.T) {
 
 	t.Log("Should panic on GetValueOrPanic error")
 
-	err = catchPanicGet(t, "/nonexisting", GetValueOrPanic[string])
+	err = catchPanicGet(t, "/nonexisting", GetOrPanic[string])
 	if !errors.Is(err, ErrPathNotFound) {
 		t.FailNow()
 	}
 
 	t.Log("Should panic on getting empty value with GetValueOrPanicEmpty")
 
-	err = SetValue("/empty", "")
+	err = Set("/empty", "")
 	check(err, t)
 
-	err = catchPanicGet(t, "/empty", GetValueOrPanicEmpty[string])
+	err = catchPanicGet(t, "/empty", GetOrPanicEmpty[string])
 	if !errors.Is(err, ErrValueEmpty) {
 		t.FailNow()
 	}
 
 	t.Log("Should panic with error on SetValueOrPanic")
 
-	err = catchPanicSet(t, "", "error", SetValueOrPanic[string])
+	err = catchPanicSet(t, "", "error", SetOrPanic[string])
 	if !errors.Is(err, ErrPathInvalid) {
 		t.FailNow()
 	}
 
 	t.Log("Should panic with error on ForceValueOrPanic")
 
-	err = catchPanicSet(t, "", "error", ForceValueOrPanic[string])
+	err = catchPanicSet(t, "", "error", ForceOrPanic[string])
 	if !errors.Is(err, ErrPathInvalid) {
 		t.FailNow()
 	}
@@ -359,10 +359,10 @@ func TestSetGet(t *testing.T) {
 	t.Log("Should get an entry and all of its children")
 	resetDB(t)
 
-	err = SetValue("/a1/b1/c1/d1", "d")
+	err = Set("/a1/b1/c1/d1", "d")
 	check(err, t)
 
-	err = SetValue("/a1/b1/c2/d1", "d")
+	err = Set("/a1/b1/c2/d1", "d")
 	check(err, t)
 
 	a1, err := GetEntry("/a1")
@@ -410,13 +410,13 @@ func TestSetGet(t *testing.T) {
 	t.Log("Should update LastUpdate timestamp of an Entry when creating a child")
 	resetDB(t)
 
-	SetValueOrPanic("a1/b1/c1", "c1")
+	SetOrPanic("a1/b1/c1", "c1")
 	b1, err := GetEntry("a1/b1")
 	check(err, t)
 
 	oldTs := b1.LastUpdate
 
-	SetValueOrPanic("a1/b1/c2", "c2")
+	SetOrPanic("a1/b1/c2", "c2")
 
 	b1, err = GetEntry("a1/b1")
 	check(err, t)
@@ -428,14 +428,14 @@ func TestSetGet(t *testing.T) {
 	t.Log("Should update LastUpdate timestamp of an Entry when deleting a child")
 	resetDB(t)
 
-	SetValueOrPanic("a1/b1/c1", "c1")
-	SetValueOrPanic("a1/b1/c2", "c2")
+	SetOrPanic("a1/b1/c1", "c1")
+	SetOrPanic("a1/b1/c2", "c2")
 	b1, err = GetEntry("a1/b1")
 	check(err, t)
 
 	oldTs = b1.LastUpdate
 
-	err = DeleteEntry("a1/b1/c2")
+	err = Delete("a1/b1/c2")
 	check(err, t)
 
 	b1, err = GetEntry("a1/b1")
@@ -451,13 +451,13 @@ func TestDelete(t *testing.T) {
 
 	t.Log("Should delete an entry and all its children")
 
-	err := SetValue("/a1/b1/c1/d1", "d")
+	err := Set("/a1/b1/c1/d1", "d")
 	check(err, t)
 
-	err = SetValue("/a1/b1/c2/d1", "d")
+	err = Set("/a1/b1/c2/d1", "d")
 	check(err, t)
 
-	err = DeleteEntry("a1/b1")
+	err = Delete("a1/b1")
 	check(err, t)
 
 	e, err := Exists("a1")
@@ -497,12 +497,12 @@ func TestDelete(t *testing.T) {
 	}
 
 	t.Log("Should return ErrPathInvalid on deleting the entry on root path")
-	err = DeleteEntry("/")
+	err = Delete("/")
 	if err != ErrPathInvalid {
 		t.FailNow()
 	}
 
-	err = DeleteEntry("")
+	err = Delete("")
 	if err != ErrPathInvalid {
 		t.FailNow()
 	}
@@ -511,13 +511,13 @@ func TestDelete(t *testing.T) {
 
 	resetDB(t)
 
-	err = SetValue("/a1/b1/c1/d1", "d1")
+	err = Set("/a1/b1/c1/d1", "d1")
 	check(err, t)
 
-	err = SetValue("/a1/b2/c1", "c1")
+	err = Set("/a1/b2/c1", "c1")
 	check(err, t)
 
-	err = SetValue("/a2/b1", "b1")
+	err = Set("/a2/b1", "b1")
 	check(err, t)
 
 	err = Wipe()
@@ -553,19 +553,19 @@ func (t *TestData) FromString(s string) error {
 func TestTypedSetGet(t *testing.T) {
 	resetDB(t)
 
-	err := SetValue("/v/string", "string")
+	err := Set("/v/string", "string")
 	check(err, t)
 
-	err = SetValue("/v/uint", 1234)
+	err = Set("/v/uint", 1234)
 	check(err, t)
 
-	err = SetValue("/v/int", -1234)
+	err = Set("/v/int", -1234)
 	check(err, t)
 
-	err = SetValue("/v/float64", -1234.5678)
+	err = Set("/v/float64", -1234.5678)
 	check(err, t)
 
-	err = SetValue("/v/bool", true)
+	err = Set("/v/bool", true)
 	check(err, t)
 
 	/*
@@ -577,31 +577,31 @@ func TestTypedSetGet(t *testing.T) {
 		}
 	*/
 
-	s, err := GetValue[string]("/v/string")
+	s, err := Get[string]("/v/string")
 	check(err, t)
 	if s != "string" {
 		t.FailNow()
 	}
 
-	u, err := GetValue[uint]("/v/uint")
+	u, err := Get[uint]("/v/uint")
 	check(err, t)
 	if u != 1234 {
 		t.FailNow()
 	}
 
-	i, err := GetValue[int]("/v/int")
+	i, err := Get[int]("/v/int")
 	check(err, t)
 	if i != -1234 {
 		t.FailNow()
 	}
 
-	f, err := GetValue[float64]("/v/float64")
+	f, err := Get[float64]("/v/float64")
 	check(err, t)
 	if f != -1234.5678 {
 		t.FailNow()
 	}
 
-	b, err := GetValue[bool]("/v/bool")
+	b, err := Get[bool]("/v/bool")
 	check(err, t)
 	if !b {
 		t.FailNow()
@@ -634,13 +634,13 @@ func TestRecurse(t *testing.T) {
 	t.Log("Should recurse on an entry and on all of its children")
 	resetDB(t)
 
-	err := SetValue("/a1/b1/c1/d1", "d")
+	err := Set("/a1/b1/c1/d1", "d")
 	check(err, t)
 
-	err = SetValue("/a1/b1/c2/d1", "d")
+	err = Set("/a1/b1/c2/d1", "d")
 	check(err, t)
 
-	err = SetValue("/a2", "a")
+	err = Set("/a2", "a")
 	check(err, t)
 
 	visited := map[string]bool{}
@@ -664,13 +664,13 @@ func TestRecurse(t *testing.T) {
 	t.Log("Should recurse on an entry and on all of its children until a certain depth")
 	resetDB(t)
 
-	err = SetValue("/a1/b1/c1/d1", "d")
+	err = Set("/a1/b1/c1/d1", "d")
 	check(err, t)
 
-	err = SetValue("/a1/b1/c2/d1", "d")
+	err = Set("/a1/b1/c2/d1", "d")
 	check(err, t)
 
-	err = SetValue("/a2", "a")
+	err = Set("/a2", "a")
 	check(err, t)
 
 	visited = map[string]bool{}
@@ -693,7 +693,7 @@ func TestRecurse(t *testing.T) {
 	t.Log("Should report the error of the recurse callback")
 	resetDB(t)
 
-	err = SetValue("a2", "a")
+	err = Set("a2", "a")
 	check(err, t)
 
 	myError := fmt.Errorf("error1234")
@@ -712,22 +712,22 @@ func TestToJSON(t *testing.T) {
 
 	t.Log("Should convert the root Entry to JSON")
 
-	err := SetValue("/a1/b1/c1/d1", "d1")
+	err := Set("/a1/b1/c1/d1", "d1")
 	check(err, t)
 
-	err = SetValue("/a1/b1/c1/d2", "d2")
+	err = Set("/a1/b1/c1/d2", "d2")
 	check(err, t)
 
-	err = SetValue("/a1/b1/c2/d1", "d1")
+	err = Set("/a1/b1/c2/d1", "d1")
 	check(err, t)
 
-	err = SetValue("/a1/b1/c2/d2", "d2")
+	err = Set("/a1/b1/c2/d2", "d2")
 	check(err, t)
 
-	err = SetValue("/a2/b1", "b1")
+	err = Set("/a2/b1", "b1")
 	check(err, t)
 
-	err = SetValue("/a3", "a3")
+	err = Set("/a3", "a3")
 	check(err, t)
 
 	j, err := EntryToJSON("")
@@ -776,13 +776,13 @@ func TestToJSON(t *testing.T) {
 
 	resetDB(t)
 
-	err = SetValue("/a1/b1/c1", "c1")
+	err = Set("/a1/b1/c1", "c1")
 	check(err, t)
 
-	err = SetValue("/a1/b1/c2", "c2")
+	err = Set("/a1/b1/c2", "c2")
 	check(err, t)
 
-	err = SetValue("/a1/b2/c1", "c1")
+	err = Set("/a1/b2/c1", "c1")
 	check(err, t)
 
 	j, err = ValuesToJSON("")
@@ -832,44 +832,44 @@ func TestFromJson(t *testing.T) {
 	buf := bytes.Buffer{}
 	buf.WriteString(j)
 
-	err := SetValue("a1/b2", "original")
+	err := Set("a1/b2", "original")
 	check(err, t)
 
-	err = SetValue("a1/b3", "original")
+	err = Set("a1/b3", "original")
 	check(err, t)
 
 	err = SetValuesFromJSON(&buf, false)
 	check(err, t)
 
-	v, err := GetValue[string]("a1/b1/c1")
+	v, err := Get[string]("a1/b1/c1")
 	check(err, t)
 
 	if v != "c1" {
 		t.FailNow()
 	}
 
-	v, err = GetValue[string]("a1/b1/c2")
+	v, err = Get[string]("a1/b1/c2")
 	check(err, t)
 
 	if v != "c2" {
 		t.FailNow()
 	}
 
-	v, err = GetValue[string]("a2")
+	v, err = Get[string]("a2")
 	check(err, t)
 
 	if v != "a2" {
 		t.FailNow()
 	}
 
-	v, err = GetValue[string]("a1/b2")
+	v, err = Get[string]("a1/b2")
 	check(err, t)
 
 	if v != "overwritten" {
 		t.FailNow()
 	}
 
-	v, err = GetValue[string]("a1/b3")
+	v, err = Get[string]("a1/b3")
 	check(err, t)
 
 	if v != "original" {
@@ -910,19 +910,19 @@ func TestFromJson(t *testing.T) {
 	err = SetEntriesFromJSON(&buf, false)
 	check(err, t)
 
-	v, err = GetValue[string]("a1/b1/c1")
+	v, err = Get[string]("a1/b1/c1")
 	check(err, t)
 	if v != "c1" {
 		t.FailNow()
 	}
 
-	v, err = GetValue[string]("a1/b1/c2")
+	v, err = Get[string]("a1/b1/c2")
 	check(err, t)
 	if v != "c2" {
 		t.FailNow()
 	}
 
-	v, err = GetValue[string]("a2")
+	v, err = Get[string]("a2")
 	check(err, t)
 	if v != "a2" {
 		t.FailNow()
@@ -942,7 +942,7 @@ func TestFromJson(t *testing.T) {
 	}
 }
 `
-	err = SetValue("e1/e2", "original")
+	err = Set("e1/e2", "original")
 	check(err, t)
 
 	buf = bytes.Buffer{}
@@ -951,13 +951,13 @@ func TestFromJson(t *testing.T) {
 	err = SetValuesFromJSON(&buf, true)
 	check(err, t)
 
-	v, err = GetValue[string]("e1/e2")
+	v, err = Get[string]("e1/e2")
 	check(err, t)
 	if v != "original" {
 		t.FailNow()
 	}
 
-	v, err = GetValue[string]("n1/n2")
+	v, err = Get[string]("n1/n2")
 	check(err, t)
 	if v != "merged" {
 		t.FailNow()
@@ -987,7 +987,7 @@ func TestFromJson(t *testing.T) {
 	}
 }
 `
-	err = SetValue("e1/e2", "original")
+	err = Set("e1/e2", "original")
 	check(err, t)
 
 	buf = bytes.Buffer{}
@@ -996,13 +996,13 @@ func TestFromJson(t *testing.T) {
 	err = SetEntriesFromJSON(&buf, true)
 	check(err, t)
 
-	v, err = GetValue[string]("e1/e2")
+	v, err = Get[string]("e1/e2")
 	check(err, t)
 	if v != "original" {
 		t.FailNow()
 	}
 
-	v, err = GetValue[string]("n1/n2")
+	v, err = Get[string]("n1/n2")
 	check(err, t)
 	if v != "merged" {
 		t.FailNow()
@@ -1017,7 +1017,7 @@ func testHooks(t *testing.T, shouldBeCalled bool) {
 	var p = "a/b/hook"
 	const v = "called"
 
-	err := SetValue(p, "a")
+	err := Set(p, "a")
 	check(err, t)
 
 	var preCalled, postCalled bool
@@ -1050,7 +1050,7 @@ func testHooks(t *testing.T, shouldBeCalled bool) {
 		return nil
 	}, false)
 
-	err = SetValue(p, v)
+	err = Set(p, v)
 	check(err, t)
 
 	if shouldBeCalled != preCalled || shouldBeCalled != postCalled {
@@ -1080,7 +1080,7 @@ func testHooks(t *testing.T, shouldBeCalled bool) {
 		return nil
 	}, true)
 
-	err = SetValue(p, v)
+	err = Set(p, v)
 	check(err, t)
 
 	timer := time.NewTimer(1 * time.Second)

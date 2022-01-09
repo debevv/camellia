@@ -145,7 +145,7 @@ func run() int {
 		var err error
 
 		if flags["-v"] {
-			out, err = cml.GetValue[string](path)
+			out, err = cml.Get[string](path)
 			if err != nil {
 				return errExit("Error getting value - %v", err)
 			}
@@ -187,12 +187,12 @@ func run() int {
 		initialize()
 
 		if flags["-f"] {
-			err := cml.ForceValue(path, value)
+			err := cml.Force(path, value)
 			if err != nil {
 				return errExit("Error forcing value - %v", err)
 			}
 		} else {
-			err := cml.SetValue(path, value)
+			err := cml.Set(path, value)
 			if err != nil {
 				return errExit("Error setting value - %v", err)
 			}
@@ -207,7 +207,7 @@ func run() int {
 
 		path := os.Args[2]
 
-		err := cml.DeleteEntry(path)
+		err := cml.Delete(path)
 		if err != nil {
 			return errExit("Error deleting entry - %v", err)
 		}

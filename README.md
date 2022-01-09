@@ -38,59 +38,61 @@ import (
 )
 
 func main() {
-  _, err := cml.Init("/home/debevv/camellia.db")
-  if err != nil {
-    fmt.Printf("Error initializing camellia - %v", err)
-    os.Exit(1)
-  }
+	_, err := cml.Init("/home/debevv/camellia.db")
+	if err != nil {
+		fmt.Printf("Error initializing camellia - %v", err)
+		os.Exit(1)
+	}
 
-  // Set a string value
-  cml.SetValue("status/userIdentifier", "ABCDEF123456")
+	// Set a string value
+	cml.Set("status/userIdentifier", "ABCDEF123456")
 
-  // Set a boolean value
-  cml.SetValue("status/system/areWeOk", true)
+	// Set a boolean value
+	cml.Set("status/system/areWeOk", true)
 
-  // Set a float value
-  cml.SetValue("sensors/temperature/latestValue", -48.0)
+	// Set a float value
+	cml.Set("sensors/temperature/latestValue", -48.0)
 
-  // Set an integer value
-  cml.SetValue("sensors/saturation/latestValue", 99)
+	// Set an integer value
+	cml.Set("sensors/saturation/latestValue", 99)
 
-  // Read a single float64 value
-  temp, err := cml.GetValue[float64]("sensors/temperature/latestValue")
-  fmt.Printf("Last temperature is: %f", temp)
+	// Read a single float64 value
+	temp, err := cml.Get[float64]("sensors/temperature/latestValue")
+	fmt.Printf("Last temperature is: %f", temp)
 
-  // Read a single bool value
-  ok, err := cml.GetValue[bool]("sensors/temperature/latestValue")
-  fmt.Printf("Are we ok? %t", ok)
+	// Read a single bool value
+	ok, err := cml.Get[bool]("sensors/temperature/latestValue")
+	fmt.Printf("Are we ok? %t", ok)
 
-  // Read a tree of entries
-  entry, err := cml.GetEntries("sensors")
-  fmt.Printf("Last update date of saturation value: %v", entry.Children["saturation"].LastUpdate)
+	// Delete an entry and its children
+	err = cml.Delete("sensors")
 
-  // Export whole DB as JSON
-  j, err := cml.ValuesToJSON("")
-  fmt.Printf("All DB values:\n%s", j)
+	// Read a tree of entries
+	sens, err := cml.GetEntry("sensors")
+	fmt.Printf("Timestamp of last update of saturation value: %v", sens.Children["saturation"].LastUpdate)
 
-  // Import DB from JSON file
-  file, err := os.Open("db.json")
-  cml.SetValuesFromJSON(file, false)
+	// Export whole DB as JSON
+	j, err := cml.ValuesToJSON("")
+	fmt.Printf("All DB values:\n%s", j)
 
-  // Register a callback called after a value is set
-  cml.SetPostSetHook("status/system/areWeOk", func(path, value string) error {
-    if value == "true" {
-        fmt.Printf("System went back to normal")
-    } else {
-        fmt.Printf("Something bad happened")
-    }
+	// Import DB from JSON file
+	file, err := os.Open("db.json")
+	cml.SetValuesFromJSON(file, false)
 
-    return nil
-  }, true)
+	// Register a callback called after a value is set
+	cml.SetPostSetHook("status/system/areWeOk", func(path, value string) error {
+		if value == "true" {
+			fmt.Printf("System went back to normal")
+		} else {
+			fmt.Printf("Something bad happened")
+		}
 
-  // Close the DB
-  cml.Close()
+		return nil
+	}, true)
+
+	// Close the DB
+	cml.Close()
 }
-
 ```
 
 ## API reference
@@ -193,10 +195,10 @@ The internal data format for `Entries`' values is `string`. For this reason, the
 
 ```go
 // Gets the value at `path` and converts it to T
-func GetValue[T Stringable](path string) (T, error)
+func Get[T Stringable](path string) (T, error)
 
 // Converts `value` from T to `string` and sets it at `path`
-func SetValue[T Stringable](path string, value T) error
+func Set[T Stringable](path string, value T) error
 ```
 
 The constraint of the type parameter is the `Stringable` `interface`:
