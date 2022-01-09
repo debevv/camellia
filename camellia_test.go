@@ -406,6 +406,44 @@ func TestSetGet(t *testing.T) {
 	if len(a1.Children["b1"].Children) > 0 {
 		t.FailNow()
 	}
+
+	t.Log("Should update LastUpdate timestamp of an Entry when creating a child")
+	resetDB(t)
+
+	SetValueOrPanic("a1/b1/c1", "c1")
+	b1, err := GetEntry("a1/b1")
+	check(err, t)
+
+	oldTs := b1.LastUpdate
+
+	SetValueOrPanic("a1/b1/c2", "c2")
+
+	b1, err = GetEntry("a1/b1")
+	check(err, t)
+
+	if b1.LastUpdate == oldTs {
+		t.FailNow()
+	}
+
+	t.Log("Should update LastUpdate timestamp of an Entry when deleting a child")
+	resetDB(t)
+
+	SetValueOrPanic("a1/b1/c1", "c1")
+	SetValueOrPanic("a1/b1/c2", "c2")
+	b1, err = GetEntry("a1/b1")
+	check(err, t)
+
+	oldTs = b1.LastUpdate
+
+	err = DeleteEntry("a1/b1/c2")
+	check(err, t)
+
+	b1, err = GetEntry("a1/b1")
+	check(err, t)
+
+	if b1.LastUpdate == oldTs {
+		t.FailNow()
+	}
 }
 
 func TestDelete(t *testing.T) {

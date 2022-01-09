@@ -183,6 +183,14 @@ func prepareStaments() error {
 		return err
 	}
 
+	stmts["updateLastUpdate"], err = db.Prepare(fmt.Sprintf(
+		"UPDATE %s SET %s = ? WHERE %s = ?",
+		table, colLastUpdateMs, colPath))
+
+	if err != nil {
+		return err
+	}
+
 	stmts["insertValueEntry"], err = db.Prepare(fmt.Sprintf(
 		"INSERT INTO %s (%s, %s, %s, %s, %s) VALUES (?, ?, 1, ?, ?)",
 		table, colPath, colLastUpdateMs, colIsValue, colParent, colValue))
@@ -360,6 +368,11 @@ func setValue(path, value string, tx *sql.Tx, force bool, skipHooks bool) error 
 			if err != nil {
 				return err
 			}
+
+			_, err = tx.Stmt(stmts["updateLastUpdate"]).Exec(now, parentPath(path))
+			if err != nil {
+				return err
+			}
 		} else {
 			if !skipHooks {
 				err = callPreSetHooks(path, value)
@@ -438,6 +451,11 @@ func setValue(path, value string, tx *sql.Tx, force bool, skipHooks bool) error 
 		return err
 	}
 
+	_, err = tx.Stmt(stmts["updateLastUpdate"]).Exec(now, parent)
+	if err != nil {
+		return err
+	}
+
 	if !skipHooks {
 		err = callPostSetHooks(path, value)
 		if err != nil {
@@ -503,6 +521,11 @@ func setRootEntry(entry *Entry, tx *sql.Tx, force bool, skipHooks bool, onlyMerg
 
 				if err != nil {
 					return fmt.Errorf("error updating value entry %s - %w", entry.Path, err)
+				}
+			} else {
+				_, err = tx.Stmt(stmts["updateLastUpdate"]).Exec(entry.LastUpdate, parent)
+				if err != nil {
+					return err
 				}
 			}
 		}
@@ -690,6 +713,11 @@ func deleteEntry(path string, tx *sql.Tx) error {
 		}
 
 		_, err = tx.Stmt(stmts["deleteEntry"]).Exec(p)
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.Stmt(stmts["updateLastUpdate"]).Exec(time.Now().UnixMilli(), parentPath(path))
 		if err != nil {
 			return err
 		}
