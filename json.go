@@ -51,6 +51,9 @@ func (e Entry) MarshalJSON() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
+/*
+ValuesToJSON represents the hierarchy of values at the specified path in the default JSON format.
+*/
 func ValuesToJSON(path string) (string, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -90,6 +93,9 @@ func ValuesToJSON(path string) (string, error) {
 	return w.String(), nil
 }
 
+/*
+ValuesToJSON represents the hierarchy of Entries at the specified path in the extended JSON format.
+*/
 func EntryToJSON(path string) (string, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -127,6 +133,11 @@ func EntryToJSON(path string) (string, error) {
 	return w.String(), nil
 }
 
+/*
+SetValuesFromJSON set (forces) the values found in the JSON representation read from reader.
+
+If onlyMerge == true, does not overwrite an Entry with the value found in the JSON, if it already exists in the DB.
+*/
 func SetValuesFromJSON(reader io.Reader, onlyMerge bool) error {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -203,6 +214,11 @@ func SetValuesFromJSON(reader io.Reader, onlyMerge bool) error {
 	return nil
 }
 
+/*
+SetValuesFromJSON set (forces) the values found in the extended JSON representation read from reader.
+
+If onlyMerge == true, does not overwrite an Entry with the one found in the JSON, if it already exists in the DB.
+*/
 func SetEntriesFromJSON(reader io.Reader, onlyMerge bool) error {
 	mutex.Lock()
 	defer mutex.Unlock()

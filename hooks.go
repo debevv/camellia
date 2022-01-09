@@ -33,6 +33,13 @@ func SetHooksEnabled(enabled bool) {
 	}
 }
 
+/*
+SetPreSetHook registers a callback to be called before the value at the specified path is changed.
+
+If one of the registered callbacks on a path returns an error, the setting of the value at that path fails.
+
+Callbacks are called on the same thread executing the set operation, in the same order as they were registered.
+*/
 func SetPreSetHook(path string, callback func(path string, value string) error) error {
 	hooksMutex.Lock()
 	defer hooksMutex.Unlock()
@@ -44,6 +51,16 @@ func SetPreSetHook(path string, callback func(path string, value string) error) 
 	return setHook(path, callback, false, hookTypePre)
 }
 
+/*
+SetPreSetHook registers a callback to be called after the value at the specified path is changed.
+
+If async == false, if one of the registered callbacks on a path returns an error,
+the setting of the value at that path fails.
+
+If async == true, the registered callback will be called inside a new goroutine, and its returned error is ignored.
+
+Callback are always called in the same order as they were registered.
+*/
 func SetPostSetHook(path string, callback func(path string, value string) error, async bool) error {
 	hooksMutex.Lock()
 	defer hooksMutex.Unlock()

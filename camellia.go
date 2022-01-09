@@ -1,3 +1,8 @@
+// camellia is a hierarchical, persistent key-value store, backed by a SQLite database.
+//
+// Its minimal footprint (just a single `.db` file) makes it suitable for usage in embedded systems, or simply as a minimalist application settings container.
+//
+// For more info about usage and examples, see the README at https://github.com/debevv/camellia
 package camellia
 
 import (
@@ -10,11 +15,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-type CustomStringable interface {
-	String() string
-	FromString(s string) error
-}
-
+/* BaseType is the type set of built-in types accepted by Get/Set functions */
 type BaseType interface {
 	~int | ~uint | ~int8 | ~uint8 | ~int32 | ~uint32 | ~int64 | ~uint64 | ~float32 | ~float64 | ~bool | ~string
 }
@@ -23,6 +24,12 @@ type BaseType interface {
 TODO: go1.18 doesn't support union of explicit types and interfaces when defining type sets in constraint interfaces
 So this is not possible for now:
 
+/*
+type CustomStringable interface {
+	String() string
+	FromString(s string) error
+}
+
 type Stringable interface {
 	BaseType | CustomStringable
 }
@@ -30,10 +37,18 @@ type Stringable interface {
 For more details: https://github.com/golang/go/issues/45346#issuecomment-862505803
 */
 
+/* Stringable is the type set of types accepted by Get/Set functions */
 type Stringable interface {
 	BaseType
 }
 
+/*
+Entry represents a single node in the hierarchical store.
+
+When IsValue == true, the Entry carries a value, and it's a leaf node in the hierarchy.
+
+When IsValue == false, the Entry does not carry a value, but its Children map can contain Entires.
+*/
 type Entry struct {
 	Path       string
 	LastUpdate time.Time
@@ -54,6 +69,11 @@ var (
 var initialized = int32(0)
 var mutex sync.Mutex
 
+/*
+Open initializes a camellia DB for usage.
+
+Most of the API methods will return ErrNoDB if Open is not called first.
+*/
 func Open(path string) (bool, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -74,6 +94,9 @@ func Open(path string) (bool, error) {
 	return created, nil
 }
 
+/*
+Close closes a camellia DB.
+*/
 func Close() error {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -94,6 +117,9 @@ func Close() error {
 	return nil
 }
 
+/*
+IsOpen returns whether a DB is currently open.
+*/
 func IsOpen() bool {
 	i := atomic.LoadInt32(&initialized)
 	if i == 0 {
@@ -103,6 +129,11 @@ func IsOpen() bool {
 	}
 }
 
+/*
+Migrate migrates a DB at dbPath to the current supported DB schema version.
+
+Returns true if the DB was actually migrated, false if it was already at the current supported DB schema version.
+*/
 func Migrate(dbPath string) (bool, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -119,6 +150,9 @@ func Migrate(dbPath string) (bool, error) {
 	return migrate()
 }
 
+/*
+GetDBPath returns the path of the current open DB.
+*/
 func GetDBPath() string {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -126,6 +160,9 @@ func GetDBPath() string {
 	return dbPath
 }
 
+/*
+GetSupportedDBSchemaVersion returns the current supported DB schema version.
+*/
 func GetSupportedDBSchemaVersion() uint64 {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -133,6 +170,9 @@ func GetSupportedDBSchemaVersion() uint64 {
 	return dbVersion
 }
 
+/*
+Set sets a value of type T to the specified path.
+*/
 func Set[T Stringable](path string, value T) error {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -161,6 +201,11 @@ func Set[T Stringable](path string, value T) error {
 	return nil
 }
 
+/*
+Force sets a value of type T to the specified path.
+
+If a non-value Entry already exists at the specified path, it is deleted first.
+*/
 func Force[T Stringable](path string, value T) error {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -189,6 +234,9 @@ func Force[T Stringable](path string, value T) error {
 	return nil
 }
 
+/*
+SetOrPanic calls Set with the specified parameters, and panics in case of error.
+*/
 func SetOrPanic[T Stringable](path string, value T) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -215,6 +263,9 @@ func SetOrPanic[T Stringable](path string, value T) {
 	}
 }
 
+/*
+ForceOrPanic calls Force with the specified parameters, and panics in case of error.
+*/
 func ForceOrPanic[T Stringable](path string, value T) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -241,6 +292,9 @@ func ForceOrPanic[T Stringable](path string, value T) {
 	}
 }
 
+/*
+Get reads the value a the specified path and returns it as type T.
+*/
 func Get[T Stringable](path string) (T, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -277,6 +331,9 @@ func Get[T Stringable](path string) (T, error) {
 	return value, nil
 }
 
+/*
+GetOrPanic calls Get with the specified parameters, and panics in case of error.
+*/
 func GetOrPanic[T Stringable](path string) T {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -313,6 +370,9 @@ func GetOrPanic[T Stringable](path string) T {
 	return value
 }
 
+/*
+GetOrPanic calls Get with the specified parameters, and panics if the read value is empty or in case of error.
+*/
 func GetOrPanicEmpty[T Stringable](path string) T {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -354,10 +414,23 @@ func GetOrPanicEmpty[T Stringable](path string) T {
 	return value
 }
 
+/*
+GetEntry returns the Entry at the specified path, including the eventual full hierarchy of children Entries.
+*/
 func GetEntry(path string) (*Entry, error) {
 	return GetEntryDepth(path, -1)
 }
 
+/*
+GetEntry returns the Entry at the specified path, including the eventual hierarchy of children Entries, but stopping
+at a specified depth.
+
+With depth > 0, stops at the specified depth.
+
+With depth == 0, returns the Entry with an empty Children map.
+
+With depth < 0, returns the full hierarchy of children Entries.
+*/
 func GetEntryDepth(path string, depth int) (*Entry, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -386,6 +459,9 @@ func GetEntryDepth(path string, depth int) (*Entry, error) {
 	return entry, nil
 }
 
+/*
+Exists returns whether an Entry exists at the specified path.
+*/
 func Exists(path string) (bool, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -414,6 +490,12 @@ func Exists(path string) (bool, error) {
 	return exists, nil
 }
 
+/*
+Recurse recurses, breadth-first, the hierarchy of Entries at the specified path, starting with the Entry at the path.
+
+For each entry, calls the specified callback with the Entry itself, its parent Entry, and the current relative depth
+in the hierarchy, with 0 being the depth of the Entry at the specified path.
+*/
 func Recurse(path string, depth int, cb func(entry *Entry, parent *Entry, depth uint) error) error {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -441,6 +523,9 @@ func Recurse(path string, depth int, cb func(entry *Entry, parent *Entry, depth 
 	return nil
 }
 
+/*
+Delete recursively deletes the Entry at the specified path and its children, if any.
+*/
 func Delete(path string) error {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -468,6 +553,9 @@ func Delete(path string) error {
 	return nil
 }
 
+/*
+Wipe deletes every Entry in the database, except for the root one (at path "").
+*/
 func Wipe() error {
 	mutex.Lock()
 	defer mutex.Unlock()
