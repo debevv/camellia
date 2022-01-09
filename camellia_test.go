@@ -785,7 +785,8 @@ func TestFromJson(t *testing.T) {
 		"b1": {
 			"c1": "c1",
 			"c2": "c2"
-		}
+		},
+		"b2": "overwritten"
 	},
 	"a2": "a2"
 }
@@ -793,7 +794,13 @@ func TestFromJson(t *testing.T) {
 	buf := bytes.Buffer{}
 	buf.WriteString(j)
 
-	err := SetValuesFromJSON(&buf, false)
+	err := SetValue("a1/b2", "original")
+	check(err, t)
+
+	err = SetValue("a1/b3", "original")
+	check(err, t)
+
+	err = SetValuesFromJSON(&buf, false)
 	check(err, t)
 
 	v, err := GetValue[string]("a1/b1/c1")
@@ -814,6 +821,20 @@ func TestFromJson(t *testing.T) {
 	check(err, t)
 
 	if v != "a2" {
+		t.FailNow()
+	}
+
+	v, err = GetValue[string]("a1/b2")
+	check(err, t)
+
+	if v != "overwritten" {
+		t.FailNow()
+	}
+
+	v, err = GetValue[string]("a1/b3")
+	check(err, t)
+
+	if v != "original" {
 		t.FailNow()
 	}
 
