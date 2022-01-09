@@ -64,7 +64,7 @@ func ValuesToJSON(path string) (string, error) {
 		return "", fmt.Errorf("error beginning transaction - %w", err)
 	}
 
-	entry, err := getEntryDepth(path, -1, tx)
+	entry, err := getEntryDepth(normalizePath(path), -1, tx)
 	if err != nil {
 		tx.Rollback()
 		return "", err
@@ -103,7 +103,7 @@ func EntryToJSON(path string) (string, error) {
 		return "", fmt.Errorf("error beginning transaction - %w", err)
 	}
 
-	entry, err := getEntryDepth(path, -1, tx)
+	entry, err := getEntryDepth(normalizePath(path), -1, tx)
 	if err != nil {
 		tx.Rollback()
 		return "", err

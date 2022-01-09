@@ -25,10 +25,6 @@ const (
 	colValue        = "value"
 )
 
-var (
-	stmtUpdateValue *sql.Stmt
-)
-
 var db *sql.DB
 var dbPath = ""
 var stmts map[string]*sql.Stmt
@@ -372,7 +368,7 @@ func setValue(path, value string, tx *sql.Tx, force bool, skipHooks bool) error 
 				}
 			}
 
-			_, err := tx.Stmt(stmts["updateValue"]).Exec(path, now, value)
+			_, err := tx.Stmt(stmts["updateValue"]).Exec(now, value, path)
 			if err != nil {
 				return err
 			}
@@ -500,7 +496,7 @@ func setRootEntry(entry *Entry, tx *sql.Tx, force bool, skipHooks bool, onlyMerg
 			}
 		} else if !onlyMerge {
 			if entry.IsValue {
-				_, err := tx.Stmt(stmts["updateValue"]).Exec(entry.Path, entry.LastUpdate, entry.Value)
+				_, err := tx.Stmt(stmts["updateValue"]).Exec(entry.LastUpdate, entry.Value, entry.Path)
 				if err != nil {
 					return err
 				}

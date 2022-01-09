@@ -134,11 +134,72 @@ func TestSetGet(t *testing.T) {
 	resetDB(t)
 
 	t.Log("Should set a value")
-	err := SetValue("/a/b/c/d", "d")
+
+	err := SetValue("////z////", "1")
+	check(err, t)
+
+	v, err := GetValue[string]("z")
+	check(err, t)
+
+	if v != "1" {
+		t.FailNow()
+	}
+
+	v, err = GetValue[string]("//z///")
+	check(err, t)
+
+	if v != "1" {
+		t.FailNow()
+	}
+
+	v, err = GetValue[string]("/z")
+	check(err, t)
+
+	if v != "1" {
+		t.FailNow()
+	}
+
+	err = SetValue("y", "1")
+	check(err, t)
+
+	v, err = GetValue[string]("//y///")
+	check(err, t)
+
+	if v != "1" {
+		t.FailNow()
+	}
+
+	v, err = GetValue[string]("y///")
+	check(err, t)
+
+	if v != "1" {
+		t.FailNow()
+	}
+
+	err = SetValue("y", "2")
+	check(err, t)
+
+	v, err = GetValue[string]("//y///")
+	check(err, t)
+
+	if v != "2" {
+		t.FailNow()
+	}
+
+	v, err = GetValue[string]("y///")
+	check(err, t)
+
+	if v != "2" {
+		t.FailNow()
+	}
+
+	resetDB(t)
+
+	err = SetValue("a/b///c/d", "d")
 	check(err, t)
 
 	t.Log("Should read the same value as the previously set one")
-	v, err := GetValue[string]("/a/b/c/d")
+	v, err = GetValue[string]("/a/b/c///d/")
 	check(err, t)
 
 	if v != "d" {
