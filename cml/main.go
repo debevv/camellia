@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	cml "github.com/debevv/camellia"
+	cml "github.com/debevv/camellia/v1"
 )
 
 const (

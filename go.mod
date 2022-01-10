@@ -1,4 +1,4 @@
-module github.com/debevv/camellia
+module github.com/debevv/camellia/v1
 
 go 1.18
 

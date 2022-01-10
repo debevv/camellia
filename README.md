@@ -34,7 +34,7 @@ import (
 	"fmt"
 	"os"
 
-	cml "github.com/debevv/camellia"
+	cml "github.com/debevv/camellia/v1"
 )
 
 func main() {
@@ -427,7 +427,7 @@ cml merge /path/to/file.json
 Install `cml` globally with:
 
 ```
-go install github.com/debevv/camellia/cml@latest
+go install github.com/debevv/camellia/v1/cml@latest
 ```
 
 ## Output of `cml help`
