@@ -97,15 +97,7 @@ func main() {
 
 ## API reference
 
-If this link does not work (pkg.go.dev is acting strange):  
-https://pkg.go.dev/github.com/debevv/camellia#section-documentation  
-try generating it with `godoc` (`go install golang.org/x/tools/cmd/godoc@latest`):
-
-```
-godoc -http=localhost:6060
-```
-
-and then opening a browser to `localhost:6060`
+https://pkg.go.dev/github.com/debevv/camellia
 
 ## Installation and prerequisites
 
